@@ -29,8 +29,8 @@ export default async function handler(req, res) {
     .single();
 
   const expired = caller?.expires_at && new Date(caller.expires_at) <= new Date();
-  if (callerError || caller?.role !== 'admin' || caller?.status !== 'active' || expired) {
-    return res.status(403).json({ error: 'Administrator access required.' });
+  if (callerError || !['admin','owner'].includes(caller?.role) || caller?.status !== 'active' || expired) {
+    return res.status(403).json({ error: 'Administrator or owner access required.' });
   }
 
   const username = cleanUsername(req.body?.username);

@@ -18,6 +18,10 @@ const els = {
   registerPassword2: document.getElementById('registerPassword2'),
   registerMessage: document.getElementById('registerMessage'),
   backToLoginBtn: document.getElementById('backToLoginBtn'),
+  loginBrandKicker: document.getElementById('loginBrandKicker'),
+  loginPortalTitle: document.getElementById('loginPortalTitle'),
+  loginPortalSubtitle: document.getElementById('loginPortalSubtitle'),
+  headerBrandKicker: document.getElementById('headerBrandKicker'),
   pageTitle: document.getElementById('pageTitle'),
   breadcrumb: document.getElementById('breadcrumb'),
   content: document.getElementById('contentArea'),
@@ -27,25 +31,51 @@ const els = {
   tileTemplate: document.getElementById('tileTemplate')
 };
 
+const DEFAULT_SETTINGS = {
+  registration_enabled: false,
+  portal_title: 'Learning Hub',
+  portal_subtitle: 'Choose your grade. Open your unit. Start learning.',
+  brand_kicker: 'PAWN TO PROFESSOR',
+  body_font: 'Nunito',
+  heading_font: 'Fredoka',
+  theme: 'classroom',
+  button_style: 'rounded3d',
+  menu_style: 'cards',
+  board_opacity: 1,
+  background_url: null,
+  accent_color: '#75e0b3',
+  primary_color: '#ffd04a'
+};
+
 const state = {
   client: null,
   session: null,
   profile: null,
-  registrationEnabled: false,
+  settings: { ...DEFAULT_SETTINGS },
   years: [],
   grades: [],
   units: [],
+  tools: [],
   ownAccess: new Set(),
   view: 'years',
   year: null,
   grade: null,
   unit: null,
-  adminTab: 'requests',
+  adminTab: 'dashboard',
   adminUsers: [],
-  selectedAdminUser: null
+  selectedAdminUser: null,
+  packages: []
 };
 
 const aliasDomain = 'portal.local';
+const FONT_OPTIONS = ['Nunito','Fredoka','Poppins','Quicksand','Baloo 2','Inter','Comic Neue','Atkinson Hyperlegible'];
+const THEME_OPTIONS = [
+  ['classroom','Sunny Classroom'],
+  ['classic','Classic Chalkboard'],
+  ['blue','Modern Blue'],
+  ['dark','Dark Classroom'],
+  ['colorful','Colorful Primary']
+];
 
 function loginIdentifierToEmail(value) {
   const clean = value.trim().toLowerCase();
@@ -63,11 +93,21 @@ function toast(message) {
   el.className = 'toast';
   el.textContent = message;
   document.getElementById('boardApp').appendChild(el);
-  setTimeout(() => el.remove(), 3000);
+  setTimeout(() => el.remove(), 3200);
 }
 function shortDate(value) {
   if (!value) return '—';
   try { return new Date(value).toLocaleDateString(); } catch { return '—'; }
+}
+function isStaff() { return ['admin','owner'].includes(state.profile?.role); }
+function isOwner() { return state.profile?.role === 'owner'; }
+function roleBadge(role) { return `<span class="role-badge ${escapeHtml(role)}">${escapeHtml(role)}</span>`; }
+function option(value, label, selected) { return `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(label)}</option>`; }
+function unitPath(unitId) {
+  const unit = state.units.find(u => u.id === unitId);
+  const grade = state.grades.find(g => g.id === unit?.grade_id);
+  const year = state.years.find(y => y.id === grade?.school_year_id);
+  return [year?.name, grade?.name, unit?.name].filter(Boolean).join(' / ');
 }
 
 async function boot() {
@@ -94,18 +134,38 @@ async function boot() {
 }
 
 async function loadPublicSettings() {
-  const { data, error } = await state.client
-    .from('portal_settings')
-    .select('registration_enabled')
-    .eq('id', 1)
-    .maybeSingle();
-  state.registrationEnabled = !error && !!data?.registration_enabled;
+  const { data, error } = await state.client.from('portal_settings').select('*').eq('id', 1).maybeSingle();
+  state.settings = { ...DEFAULT_SETTINGS, ...(!error && data ? data : {}) };
+  applyDesign(state.settings);
+}
+
+function applyDesign(settings) {
+  const root = document.documentElement;
+  root.style.setProperty('--body-font', `'${settings.body_font || DEFAULT_SETTINGS.body_font}', system-ui, sans-serif`);
+  root.style.setProperty('--heading-font', `'${settings.heading_font || DEFAULT_SETTINGS.heading_font}', system-ui, sans-serif`);
+  root.style.setProperty('--accent', settings.accent_color || DEFAULT_SETTINGS.accent_color);
+  root.style.setProperty('--primary', settings.primary_color || DEFAULT_SETTINGS.primary_color);
+  root.style.setProperty('--board-opacity', String(Math.min(1, Math.max(.65, Number(settings.board_opacity || 1)))));
+  root.dataset.theme = settings.theme || 'classroom';
+  root.dataset.buttonStyle = settings.button_style || 'rounded3d';
+  root.dataset.menuStyle = settings.menu_style || 'cards';
+
+  const scene = document.querySelector('.scene');
+  scene.style.backgroundImage = settings.background_url
+    ? `url("${String(settings.background_url).replace(/"/g, '%22')}")`
+    : "url('./assets/classroom-bg.png')";
+
+  els.loginBrandKicker.textContent = settings.brand_kicker || DEFAULT_SETTINGS.brand_kicker;
+  els.headerBrandKicker.textContent = settings.brand_kicker || DEFAULT_SETTINGS.brand_kicker;
+  els.loginPortalTitle.textContent = settings.portal_title || DEFAULT_SETTINGS.portal_title;
+  els.loginPortalSubtitle.textContent = settings.portal_subtitle || DEFAULT_SETTINGS.portal_subtitle;
+  document.title = `${settings.brand_kicker || 'Pawn to Professor'} — ${settings.portal_title || 'Learning Hub'}`;
 }
 
 function showLogin(message = '') {
   hide(els.loading); hide(els.portalView); hide(els.registerView); show(els.loginView);
   els.loginMessage.textContent = message;
-  state.registrationEnabled ? show(els.openRegisterBtn) : hide(els.openRegisterBtn);
+  state.settings.registration_enabled ? show(els.openRegisterBtn) : hide(els.openRegisterBtn);
   els.loginUsername.focus();
 }
 function showRegister() {
@@ -126,8 +186,7 @@ els.registerForm.addEventListener('submit', async (e) => {
   }
   els.registerMessage.textContent = 'Sending request…';
   const res = await fetch('/api/register-request', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       username: els.registerUsername.value,
       displayName: els.registerName.value,
@@ -161,13 +220,16 @@ els.loginForm.addEventListener('submit', async (e) => {
 
 els.logoutBtn.addEventListener('click', async () => {
   await state.client.auth.signOut();
-  Object.assign(state, { session:null, profile:null, view:'years', year:null, grade:null, unit:null, selectedAdminUser:null });
+  Object.assign(state, {
+    session:null, profile:null, view:'years', year:null, grade:null, unit:null,
+    selectedAdminUser:null, adminUsers:[], packages:[], tools:[]
+  });
   await loadPublicSettings();
   showLogin();
 });
 
 els.backBtn.addEventListener('click', () => {
-  if (state.view === 'admin') { state.view = 'years'; render(); return; }
+  if (state.view === 'admin' || state.view === 'tools') { state.view = 'years'; render(); return; }
   if (state.view === 'activities') { state.view = 'units'; state.unit = null; }
   else if (state.view === 'units') { state.view = 'grades'; state.grade = null; }
   else if (state.view === 'grades') { state.view = 'years'; state.year = null; }
@@ -176,8 +238,8 @@ els.backBtn.addEventListener('click', () => {
 
 els.adminBtn.addEventListener('click', async () => {
   state.view = 'admin';
-  state.adminTab = 'requests';
-  await loadAdminUsers();
+  state.adminTab = 'dashboard';
+  await Promise.all([loadAdminUsers(), loadPackages()]);
   render();
 });
 
@@ -202,7 +264,7 @@ async function enterPortal() {
   }
 
   state.profile = profile;
-  await Promise.all([loadStructure(), loadOwnAccess()]);
+  await Promise.all([loadStructure(), loadOwnAccess(), loadExternalTools(), loadPublicSettings()]);
   state.view = 'years';
   show(els.portalView);
   render();
@@ -221,7 +283,7 @@ async function loadStructure() {
 }
 
 async function loadOwnAccess() {
-  if (state.profile?.role === 'admin') {
+  if (isStaff()) {
     state.ownAccess = new Set(state.units.map(u => u.id));
     return;
   }
@@ -231,10 +293,20 @@ async function loadOwnAccess() {
   state.ownAccess = new Set((data || []).filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now).map(r => r.unit_id));
 }
 
+async function loadExternalTools() {
+  const { data, error } = await state.client.from('external_tools').select('*').order('sort_order').order('name');
+  if (error) { state.tools = []; return; }
+  state.tools = (data || []).filter(tool => tool.enabled && (
+    tool.audience === 'all_members' ||
+    (tool.audience === 'staff_only' && isStaff()) ||
+    (tool.audience === 'owner_only' && isOwner())
+  ));
+}
+
 function setHeader(title, crumbs = []) {
   els.pageTitle.textContent = title;
   els.breadcrumb.textContent = crumbs.join('  ›  ');
-  state.profile?.role === 'admin' ? show(els.adminBtn) : hide(els.adminBtn);
+  isStaff() ? show(els.adminBtn) : hide(els.adminBtn);
   state.view === 'years' ? hide(els.backBtn) : show(els.backBtn);
 }
 
@@ -254,6 +326,7 @@ function render() {
   else if (state.view === 'grades') renderGrades();
   else if (state.view === 'units') renderUnits();
   else if (state.view === 'activities') renderActivities();
+  else if (state.view === 'tools') renderTools();
   else if (state.view === 'admin') renderAdmin();
 }
 
@@ -262,11 +335,21 @@ function renderYears() {
   const grid = document.createElement('div'); grid.className = 'tile-grid';
   for (const year of state.years) {
     const grades = state.grades.filter(g => g.school_year_id === year.id);
-    grid.appendChild(makeTile({ icon:'📚', title:year.name, subtitle:`${grades.length} grades`, onClick:()=>{ state.year=year; state.view='grades'; render(); } }));
+    grid.appendChild(makeTile({
+      icon:'📚', title:year.name, subtitle:`${grades.length} grades`,
+      onClick:()=>{ state.year=year; state.view='grades'; render(); }
+    }));
   }
-  if (!state.years.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No school years yet.</strong><br>Ask the administrator to add one.</div></div>';
+  if (state.tools.length) {
+    grid.appendChild(makeTile({
+      icon:'🧰', title:'Teacher Tools', subtitle:`${state.tools.length} tool${state.tools.length === 1 ? '' : 's'}`,
+      onClick:()=>{ state.view='tools'; render(); }
+    }));
+  }
+  if (!grid.children.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No content yet.</strong><br>Ask the administrator to add a year or tool.</div></div>';
   else els.content.appendChild(grid);
 }
+
 function renderGrades() {
   setHeader('Choose a Grade', [state.year.name]);
   const grid = document.createElement('div'); grid.className = 'tile-grid';
@@ -274,10 +357,15 @@ function renderGrades() {
   for (const grade of grades) {
     const units = state.units.filter(u => u.grade_id === grade.id);
     const unlockedCount = units.filter(u => state.ownAccess.has(u.id)).length;
-    grid.appendChild(makeTile({ icon:'🎒', title:grade.name, subtitle:state.profile.role==='admin'?`${units.length} units`:`${unlockedCount}/${units.length} units open`, onClick:()=>{ state.grade=grade; state.view='units'; render(); } }));
+    grid.appendChild(makeTile({
+      icon:'🎒', title:grade.name,
+      subtitle:isStaff()?`${units.length} units`:`${unlockedCount}/${units.length} units open`,
+      onClick:()=>{ state.grade=grade; state.view='units'; render(); }
+    }));
   }
   els.content.appendChild(grid);
 }
+
 function renderUnits() {
   setHeader('Choose a Unit', [state.year.name, state.grade.name]);
   const grid = document.createElement('div'); grid.className='tile-grid';
@@ -292,6 +380,7 @@ function renderUnits() {
   if (!units.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No units yet.</strong><br>The administrator can add units from Admin.</div></div>';
   else els.content.appendChild(grid);
 }
+
 async function renderActivities() {
   setHeader(state.unit.name, [state.year.name, state.grade.name, state.unit.name]);
   els.content.innerHTML = '<div class="empty-state">Loading activities…</div>';
@@ -304,43 +393,135 @@ async function renderActivities() {
   data.forEach(a => {
     const card = document.createElement('article'); card.className='activity-card';
     card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')}</p>`;
-    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Play ▶'; btn.addEventListener('click',()=>window.open(a.launch_url,'_blank','noopener,noreferrer'));
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Open ▶';
+    btn.addEventListener('click',()=>window.open(a.launch_url,'_blank','noopener,noreferrer'));
+    card.appendChild(btn); list.appendChild(card);
+  });
+  els.content.appendChild(list);
+}
+
+function renderTools() {
+  setHeader('Teacher Tools', ['Tools']);
+  if (!state.tools.length) {
+    els.content.innerHTML = '<div class="empty-state">No external tools are available for this account.</div>';
+    return;
+  }
+  const list = document.createElement('div'); list.className='tool-list';
+  state.tools.forEach(tool => {
+    const card = document.createElement('article'); card.className='tool-card';
+    card.innerHTML = `<h3>${escapeHtml(tool.icon || '🧰')} ${escapeHtml(tool.name)}</h3><p>${escapeHtml(tool.description || 'Open external tool')}</p>`;
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Open in new tab ↗';
+    btn.addEventListener('click',()=>window.open(tool.url,'_blank','noopener,noreferrer'));
     card.appendChild(btn); list.appendChild(card);
   });
   els.content.appendChild(list);
 }
 
 async function loadAdminUsers() {
-  if (state.profile?.role !== 'admin') return;
+  if (!isStaff()) return;
   const { data, error } = await state.client.from('profiles').select('*').order('username');
   if (!error) state.adminUsers = data || [];
 }
 
+async function loadPackages() {
+  if (!isStaff()) return;
+  const { data, error } = await state.client.from('access_packages').select('*').order('name');
+  state.packages = error ? [] : (data || []);
+}
+
+async function logAudit(action, entityType = null, entityId = null, details = {}) {
+  if (!isStaff()) return;
+  try {
+    await state.client.from('audit_log').insert({
+      actor_id: state.session.user.id,
+      action,
+      entity_type: entityType,
+      entity_id: entityId ? String(entityId) : null,
+      details
+    });
+  } catch { /* audit logging must never block the main action */ }
+}
+
 function renderAdmin() {
-  setHeader('Administrator', ['Admin']);
+  setHeader(isOwner() ? 'Owner Administration' : 'Administrator', ['Admin']);
   const pendingCount = state.adminUsers.filter(u => u.status === 'pending').length;
+  const tabs = [
+    ['dashboard','📊 Dashboard'],
+    ['requests',`👥 Requests${pendingCount?` (${pendingCount})`:''}`],
+    ['users','👤 Users & Access'],
+    ['packages','🎟 Access Packages'],
+    ['content','🎮 Activities'],
+    ['structure','📚 Content Structure'],
+    ['tools','🧰 Teacher Tools'],
+    ['design','🎨 Design Studio'],
+    ['settings','⚙️ Settings'],
+    ['audit','🧾 Audit Log']
+  ];
   const wrap = document.createElement('div'); wrap.className='admin-wrap';
   wrap.innerHTML = `
     <aside class="admin-sidebar"><div class="admin-tabs">
-      <button class="btn btn-ghost ${state.adminTab==='requests'?'active':''}" data-tab="requests">👥 Requests${pendingCount?` (${pendingCount})`:''}</button>
-      <button class="btn btn-ghost ${state.adminTab==='users'?'active':''}" data-tab="users">👤 Users & Access</button>
-      <button class="btn btn-ghost ${state.adminTab==='content'?'active':''}" data-tab="content">🎮 Activities</button>
-      <button class="btn btn-ghost ${state.adminTab==='structure'?'active':''}" data-tab="structure">📚 Content Structure</button>
-      <button class="btn btn-ghost ${state.adminTab==='settings'?'active':''}" data-tab="settings">⚙️ Settings</button>
+      ${tabs.map(([id,label])=>`<button class="btn btn-ghost ${state.adminTab===id?'active':''}" data-tab="${id}">${label}</button>`).join('')}
     </div></aside>
     <section class="admin-panel" id="adminPanel"></section>`;
   els.content.appendChild(wrap);
   wrap.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', async () => {
     state.adminTab = btn.dataset.tab;
-    await loadAdminUsers();
+    await Promise.all([loadAdminUsers(), loadPackages()]);
     render();
   }));
   const panel = wrap.querySelector('#adminPanel');
+  if (state.adminTab === 'dashboard') renderAdminDashboard(panel);
   if (state.adminTab === 'requests') renderAdminRequests(panel);
   if (state.adminTab === 'users') renderAdminUsers(panel);
+  if (state.adminTab === 'packages') renderAdminPackages(panel);
   if (state.adminTab === 'content') renderAdminContent(panel);
   if (state.adminTab === 'structure') renderAdminStructure(panel);
+  if (state.adminTab === 'tools') renderAdminTools(panel);
+  if (state.adminTab === 'design') renderAdminDesign(panel);
   if (state.adminTab === 'settings') renderAdminSettings(panel);
+  if (state.adminTab === 'audit') renderAdminAudit(panel);
+}
+
+async function renderAdminDashboard(panel) {
+  panel.innerHTML = '<h2>Dashboard</h2><div id="dashArea">Loading…</div>';
+  const [activityCount, toolCount] = await Promise.all([
+    state.client.from('activities').select('*', { count:'exact', head:true }),
+    state.client.from('external_tools').select('*', { count:'exact', head:true })
+  ]);
+  if (state.adminTab !== 'dashboard') return;
+  const pending = state.adminUsers.filter(u=>u.status==='pending').length;
+  const active = state.adminUsers.filter(u=>u.status==='active').length;
+  const area = panel.querySelector('#dashArea');
+  area.innerHTML = `
+    <div class="dashboard-grid">
+      <div class="dashboard-card"><strong>${state.adminUsers.length}</strong><span>Total accounts</span></div>
+      <div class="dashboard-card"><strong>${active}</strong><span>Active accounts</span></div>
+      <div class="dashboard-card"><strong>${pending}</strong><span>Pending requests</span></div>
+      <div class="dashboard-card"><strong>${state.years.length}</strong><span>School years</span></div>
+      <div class="dashboard-card"><strong>${state.units.length}</strong><span>Published units</span></div>
+      <div class="dashboard-card"><strong>${activityCount.count ?? 0}</strong><span>Activities</span></div>
+    </div>
+    <hr class="soft">
+    <div class="button-row">
+      <button id="exportBackup" class="btn btn-accent">Download JSON Backup</button>
+      <button id="refreshDashboard" class="btn btn-ghost">Refresh</button>
+    </div>
+    <p class="admin-note">Teacher tools configured: ${toolCount.count ?? 0}. Registration is ${state.settings.registration_enabled ? 'ON' : 'OFF'}.</p>`;
+  area.querySelector('#exportBackup').addEventListener('click', exportAdminBackup);
+  area.querySelector('#refreshDashboard').addEventListener('click', ()=>renderAdminDashboard(panel));
+}
+
+async function exportAdminBackup() {
+  const tables = ['profiles','school_years','grades','units','activities','user_unit_access','access_packages','access_package_units','external_tools','portal_settings'];
+  const backup = { exported_at:new Date().toISOString(), version:'1.2', data:{} };
+  for (const table of tables) {
+    const { data, error } = await state.client.from(table).select('*');
+    backup.data[table] = error ? { error:error.message } : data;
+  }
+  const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`learning-hub-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+  await logAudit('backup_exported','system',null,{});
 }
 
 function renderAdminRequests(panel) {
@@ -354,12 +535,14 @@ function renderAdminRequests(panel) {
     card.querySelector('[data-approve]').addEventListener('click', async () => {
       const { error } = await state.client.from('profiles').update({status:'active'}).eq('id', user.id);
       if (error) return toast(error.message);
+      await logAudit('registration_approved','profile',user.id,{username:user.username});
       toast(`${user.username} approved. Now choose unit access in Users & Access.`); await loadAdminUsers(); render();
     });
     card.querySelector('[data-reject]').addEventListener('click', async () => {
       if (!confirm(`Reject ${user.username}?`)) return;
       const { error } = await state.client.from('profiles').update({status:'rejected'}).eq('id', user.id);
       if (error) return toast(error.message);
+      await logAudit('registration_rejected','profile',user.id,{username:user.username});
       toast('Registration rejected.'); await loadAdminUsers(); render();
     });
     list.appendChild(card);
@@ -379,13 +562,13 @@ function renderAdminUsers(panel) {
     <hr class="soft">
     <div class="admin-form-grid" style="grid-template-columns:.75fr 1.25fr">
       <div><h3>Accounts</h3><div class="user-list" id="userList"></div></div>
-      <div id="permissionEditor"><p class="admin-note">Select a user to control exactly which units they can open.</p></div>
+      <div id="permissionEditor"><p class="admin-note">Select a user to control role, status, notes and exact unit access.</p></div>
     </div>`;
   panel.querySelector('#createUserBtn').addEventListener('click', createUserFromAdmin);
   const userList = panel.querySelector('#userList');
   state.adminUsers.filter(u => u.status !== 'pending').forEach(user => {
     const row = document.createElement('button'); row.className=`user-row ${state.selectedAdminUser?.id===user.id?'active':''}`;
-    row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><small>${escapeHtml(user.status)}</small>`;
+    row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><span>${roleBadge(user.role)}<br><small>${escapeHtml(user.status)}</small></span>`;
     row.addEventListener('click', async () => {
       state.selectedAdminUser=user; renderAdminUserPermissions(panel.querySelector('#permissionEditor'),user);
       userList.querySelectorAll('.user-row').forEach(x=>x.classList.remove('active')); row.classList.add('active');
@@ -402,24 +585,42 @@ async function createUserFromAdmin() {
   const password = document.getElementById('newPassword').value;
   if (!username || password.length < 8) return toast('Add a username and a password of at least 8 characters.');
   const { data: { session } } = await state.client.auth.getSession();
-  const res = await fetch('/api/admin/create-user', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`}, body:JSON.stringify({username,displayName,contactEmail,password}) });
+  const res = await fetch('/api/admin/create-user', {
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+    body:JSON.stringify({username,displayName,contactEmail,password})
+  });
   const body = await res.json().catch(()=>({}));
   if (!res.ok) return toast(body.error || 'Could not create user.');
+  await logAudit('user_created','profile',body.id,{username});
   toast(`User ${username} created.`); state.selectedAdminUser=null; await loadAdminUsers(); render();
 }
 
 async function renderAdminUserPermissions(container, user) {
   container.innerHTML='<p class="admin-note">Loading access…</p>';
-  const { data: access, error } = await state.client.from('user_unit_access').select('*').eq('user_id', user.id);
+  const [{ data: access, error }, { data: packageUnits }] = await Promise.all([
+    state.client.from('user_unit_access').select('*').eq('user_id', user.id),
+    state.client.from('access_package_units').select('*')
+  ]);
   if (error) { container.textContent=error.message; return; }
   const checked = new Set((access||[]).map(a=>a.unit_id));
+  const roleOptions = ['user','admin','owner'].map(r=>option(r,r[0].toUpperCase()+r.slice(1),user.role)).join('');
   container.innerHTML = `
-    <h3>${escapeHtml(user.username || '')}</h3>
-    <p class="admin-note">${escapeHtml(user.contact_email || 'No contact email')} · ${escapeHtml(user.role)}</p>
-    <div class="admin-form-grid"><label>Status<select id="userStatus"><option value="active">Active</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label><label>Expiry date<input id="userExpiry" type="date"></label></div>
-    <div style="display:flex;gap:.45em;margin:.6em 0"><button id="allAccess" class="btn btn-small btn-ghost">All Units</button><button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button><button id="clearAccess" class="btn btn-small btn-ghost">Clear</button></div>
-    <div id="permissionMatrix"></div><button id="savePermissions" class="btn btn-accent" type="button">Save Access</button>`;
-  container.querySelector('#userStatus').value = ['active','inactive','rejected'].includes(user.status) ? user.status : 'inactive';
+    <h3>${escapeHtml(user.username || '')} ${roleBadge(user.role)}</h3>
+    <p class="admin-note">${escapeHtml(user.contact_email || 'No contact email')}</p>
+    <div class="admin-form-grid">
+      <label>Status<select id="userStatus">${['active','inactive','rejected'].map(s=>option(s,s[0].toUpperCase()+s.slice(1),user.status)).join('')}</select></label>
+      <label>Expiry date<input id="userExpiry" type="date"></label>
+      <label>Account tag<input id="userTag" placeholder="School / Trial / VIP" value="${escapeHtml(user.account_tag || '')}"></label>
+      <label>Role<select id="userRole" ${isOwner() ? '' : 'disabled'}>${roleOptions}</select></label>
+      <label class="wide">Private admin notes<textarea id="userNotes" rows="2" placeholder="Internal notes only">${escapeHtml(user.admin_notes || '')}</textarea></label>
+    </div>
+    ${!isOwner()?'<p class="admin-note">Only the Owner can promote or demote administrators.</p>':''}
+    <div class="admin-form-grid" style="margin-top:.55em">
+      <label>Apply access package<select id="packageSelect"><option value="">Choose package…</option>${state.packages.filter(p=>p.active).map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></label>
+      <div style="display:flex;align-items:end"><button id="applyPackage" class="btn btn-small btn-ghost">Apply Package</button></div>
+    </div>
+    <div style="display:flex;gap:.45em;margin:.6em 0;flex-wrap:wrap"><button id="allAccess" class="btn btn-small btn-ghost">All Units</button><button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button><button id="clearAccess" class="btn btn-small btn-ghost">Clear</button></div>
+    <div id="permissionMatrix"></div><button id="savePermissions" class="btn btn-accent" type="button">Save User</button>`;
   if (user.expires_at) container.querySelector('#userExpiry').value = new Date(user.expires_at).toISOString().slice(0,10);
   const matrix=container.querySelector('#permissionMatrix');
   state.years.forEach(year=>{
@@ -439,23 +640,89 @@ async function renderAdminUserPermissions(container, user) {
   container.querySelector('#allAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=true));
   container.querySelector('#clearAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=false));
   container.querySelector('#unit1All').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>{ const unit=state.units.find(u=>u.id===cb.dataset.unitId); if(unit?.name.trim().toLowerCase()==='unit 1') cb.checked=true; }));
-  container.querySelector('#savePermissions').addEventListener('click',()=>savePermissions(container,user));
+  container.querySelector('#applyPackage').addEventListener('click',()=>{
+    const id=container.querySelector('#packageSelect').value; if(!id)return toast('Choose a package first.');
+    const ids=(packageUnits||[]).filter(x=>x.package_id===id).map(x=>x.unit_id);
+    container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
+    toast('Package added to the current selection. Press Save User to confirm.');
+  });
+  container.querySelector('#savePermissions').addEventListener('click',()=>saveUserAndPermissions(container,user));
 }
 
-async function savePermissions(container,user) {
+async function saveUserAndPermissions(container,user) {
   const selected=[...container.querySelectorAll('[data-unit-id]:checked')].map(cb=>cb.dataset.unitId);
-  const status=container.querySelector('#userStatus').value; const expiryRaw=container.querySelector('#userExpiry').value;
+  const status=container.querySelector('#userStatus').value;
+  const role=container.querySelector('#userRole').value;
+  const expiryRaw=container.querySelector('#userExpiry').value;
   const expiresAt=expiryRaw?new Date(`${expiryRaw}T23:59:59`).toISOString():null;
-  const {error:profileError}=await state.client.from('profiles').update({status,expires_at:expiresAt}).eq('id',user.id);
+  const profilePatch = {
+    status, expires_at:expiresAt,
+    account_tag:container.querySelector('#userTag').value.trim() || null,
+    admin_notes:container.querySelector('#userNotes').value.trim() || null
+  };
+  if (isOwner()) profilePatch.role = role;
+  const {error:profileError}=await state.client.from('profiles').update(profilePatch).eq('id',user.id);
   if(profileError) return toast(profileError.message);
   const {error:deleteError}=await state.client.from('user_unit_access').delete().eq('user_id',user.id);
   if(deleteError) return toast(deleteError.message);
-  if(selected.length){ const rows=selected.map(unitId=>({user_id:user.id,unit_id:unitId,granted_by:state.session.user.id})); const {error:insertError}=await state.client.from('user_unit_access').insert(rows); if(insertError) return toast(insertError.message); }
-  user.status=status; user.expires_at=expiresAt; toast(`Access saved for ${user.username}.`);
+  if(selected.length){
+    const rows=selected.map(unitId=>({user_id:user.id,unit_id:unitId,granted_by:state.session.user.id}));
+    const {error:insertError}=await state.client.from('user_unit_access').insert(rows);
+    if(insertError) return toast(insertError.message);
+  }
+  Object.assign(user, profilePatch);
+  await logAudit('user_updated','profile',user.id,{username:user.username,role:profilePatch.role||user.role,status,units:selected.length});
+  toast(`User ${user.username} saved.`);
+  await loadAdminUsers(); render();
+}
+
+function packageMatrixHtml(checked = new Set()) {
+  return state.years.map(year=>{
+    const grades = state.grades.filter(g=>g.school_year_id===year.id);
+    return `<div class="permission-group"><strong>${escapeHtml(year.name)}</strong>${grades.map(grade=>{
+      const units=state.units.filter(u=>u.grade_id===grade.id);
+      return `<div class="permission-grade"><span>${escapeHtml(grade.name)}</span></div><div class="permission-units">${units.map(u=>`<label><input type="checkbox" data-package-unit="${u.id}" ${checked.has(u.id)?'checked':''}> ${escapeHtml(u.name)}</label>`).join('')}</div>`;
+    }).join('')}</div>`;
+  }).join('');
+}
+
+async function renderAdminPackages(panel) {
+  panel.innerHTML=`
+    <h2>Access Packages</h2><p class="admin-note">Create reusable access presets such as “All Grades — Unit 1”, “Grade 5 Full” or “School Full Access”.</p>
+    <div class="admin-form-grid"><label>Name<input id="packageName" placeholder="All Grades — Unit 1"></label><label>Description<input id="packageDescription" placeholder="Optional note"></label></div>
+    <div id="packageMatrix">${packageMatrixHtml()}</div>
+    <button id="savePackage" class="btn btn-accent">+ Create Package</button>
+    <hr class="soft"><div id="packageList" class="package-list"></div>`;
+  panel.querySelector('#savePackage').addEventListener('click',async()=>{
+    const name=panel.querySelector('#packageName').value.trim(); const description=panel.querySelector('#packageDescription').value.trim();
+    const unitIds=[...panel.querySelectorAll('[data-package-unit]:checked')].map(x=>x.dataset.packageUnit);
+    if(!name || !unitIds.length)return toast('Add a package name and select at least one unit.');
+    const {data,error}=await state.client.from('access_packages').insert({name,description:description||null,active:true,created_by:state.session.user.id}).select().single();
+    if(error)return toast(error.message);
+    const rows=unitIds.map(unit_id=>({package_id:data.id,unit_id}));
+    const {error:e2}=await state.client.from('access_package_units').insert(rows); if(e2)return toast(e2.message);
+    await logAudit('package_created','access_package',data.id,{name,units:unitIds.length});
+    await loadPackages(); toast('Access package created.'); render();
+  });
+  const list=panel.querySelector('#packageList');
+  if(!state.packages.length){list.innerHTML='<p class="admin-note">No packages yet.</p>';return;}
+  const {data:allUnits}=await state.client.from('access_package_units').select('*');
+  state.packages.forEach(pkg=>{
+    const ids=(allUnits||[]).filter(x=>x.package_id===pkg.id).map(x=>x.unit_id);
+    const card=document.createElement('div'); card.className='package-card';
+    card.innerHTML=`<div class="package-head"><div><strong>${escapeHtml(pkg.name)}</strong><div class="meta">${escapeHtml(pkg.description||'')}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-toggle>${pkg.active?'Disable':'Enable'}</button><button class="btn btn-small btn-danger" data-delete>Delete</button></div></div><div class="package-units">${ids.map(unitPath).filter(Boolean).join(' · ') || 'No units'}</div>`;
+    card.querySelector('[data-toggle]').addEventListener('click',async()=>{const {error}=await state.client.from('access_packages').update({active:!pkg.active}).eq('id',pkg.id);if(error)toast(error.message);else{await logAudit('package_toggled','access_package',pkg.id,{active:!pkg.active});await loadPackages();render();}});
+    card.querySelector('[data-delete]').addEventListener('click',async()=>{if(!confirm(`Delete package ${pkg.name}?`))return;const {error}=await state.client.from('access_packages').delete().eq('id',pkg.id);if(error)toast(error.message);else{await logAudit('package_deleted','access_package',pkg.id,{name:pkg.name});await loadPackages();render();}});
+    list.appendChild(card);
+  });
 }
 
 function buildHierarchyOptions() {
   return { yearOptions: state.years.map(y=>`<option value="${y.id}">${escapeHtml(y.name)}</option>`).join('') };
+}
+
+function allUnitOptions(selectedId='') {
+  return state.units.map(u=>`<option value="${u.id}" ${u.id===selectedId?'selected':''}>${escapeHtml(unitPath(u.id))}</option>`).join('');
 }
 
 function renderAdminContent(panel) {
@@ -475,26 +742,36 @@ function renderAdminContent(panel) {
   yearSel.addEventListener('change',refreshGrades); gradeSel.addEventListener('change',refreshUnits); unitSel.addEventListener('change',()=>loadManagedActivities(panel)); refreshGrades();
   panel.querySelector('#addActivity').addEventListener('click',async()=>{
     const row={unit_id:unitSel.value,title:panel.querySelector('#activityTitle').value.trim(),type:panel.querySelector('#activityType').value,launch_url:panel.querySelector('#activityUrl').value.trim(),published:true,sort_order:10};
-    if(!row.unit_id||!row.title||!row.launch_url) return toast('Choose a unit and add a title and URL.');
-    const {error}=await state.client.from('activities').insert(row); if(error) toast(error.message); else { toast('Activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; loadManagedActivities(panel); }
+    if(!row.unit_id||!row.title||!row.launch_url)return toast('Choose a unit and add a title and URL.');
+    const {data,error}=await state.client.from('activities').insert(row).select().single();
+    if(error)toast(error.message);else{await logAudit('activity_created','activity',data.id,{title:row.title,unit_id:row.unit_id});toast('Activity published.');panel.querySelector('#activityTitle').value='';panel.querySelector('#activityUrl').value='';loadManagedActivities(panel);}
   });
 }
 
 async function loadManagedActivities(panel) {
-  const unitId=panel.querySelector('#activityUnit')?.value; const list=panel.querySelector('#activityManageList'); if(!unitId||!list){return;}
+  const unitId=panel.querySelector('#activityUnit')?.value; const list=panel.querySelector('#activityManageList'); if(!unitId||!list)return;
   list.innerHTML='Loading…';
   const {data,error}=await state.client.from('activities').select('*').eq('unit_id',unitId).order('sort_order');
   if(error){list.textContent=error.message;return;} list.innerHTML='';
   if(!data?.length){list.innerHTML='<p class="admin-note">No activities in this unit yet.</p>';return;}
   data.forEach(a=>{
     const card=document.createElement('div'); card.className='manage-card';
-    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
     card.querySelector('[data-edit]').addEventListener('click',async()=>{
       const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
       const url=prompt('Launch URL',a.launch_url); if(url===null||!url.trim())return;
-      const {error:e}=await state.client.from('activities').update({title:title.trim(),launch_url:url.trim()}).eq('id',a.id); if(e)toast(e.message);else{toast('Activity updated.');loadManagedActivities(panel);}
+      const {error:e}=await state.client.from('activities').update({title:title.trim(),launch_url:url.trim()}).eq('id',a.id); if(e)toast(e.message);else{await logAudit('activity_updated','activity',a.id,{title:title.trim()});toast('Activity updated.');loadManagedActivities(panel);}
     });
-    card.querySelector('[data-toggle]').addEventListener('click',async()=>{ const {error:e}=await state.client.from('activities').update({published:!a.published}).eq('id',a.id); if(e)toast(e.message);else{toast(a.published?'Activity hidden.':'Activity published.');loadManagedActivities(panel);} });
+    card.querySelector('[data-copy]').addEventListener('click',async()=>{
+      const title=prompt('Title for the copy',`${a.title} Copy`); if(title===null||!title.trim())return;
+      const {data:copy,error:e}=await state.client.from('activities').insert({unit_id:a.unit_id,title:title.trim(),type:a.type,launch_url:a.launch_url,thumbnail_url:a.thumbnail_url,sort_order:(a.sort_order||0)+1,published:a.published}).select().single();
+      if(e)toast(e.message);else{await logAudit('activity_duplicated','activity',copy.id,{source:a.id});toast('Activity duplicated.');loadManagedActivities(panel);}
+    });
+    card.querySelector('[data-move]').addEventListener('change',async(e)=>{
+      const target=e.target.value; if(!target||target===a.unit_id)return;
+      const {error:moveError}=await state.client.from('activities').update({unit_id:target}).eq('id',a.id); if(moveError)toast(moveError.message);else{await logAudit('activity_moved','activity',a.id,{to:target});toast('Activity moved.');loadManagedActivities(panel);}
+    });
+    card.querySelector('[data-toggle]').addEventListener('click',async()=>{ const {error:e}=await state.client.from('activities').update({published:!a.published}).eq('id',a.id); if(e)toast(e.message);else{await logAudit('activity_visibility_changed','activity',a.id,{published:!a.published});toast(a.published?'Activity hidden.':'Activity published.');loadManagedActivities(panel);} });
     list.appendChild(card);
   });
 }
@@ -502,40 +779,52 @@ async function loadManagedActivities(panel) {
 function renderAdminStructure(panel) {
   const {yearOptions}=buildHierarchyOptions();
   panel.innerHTML=`
-    <h2>Content Structure</h2><p class="admin-note">Add, rename or archive years and grades. Add, rename or hide units. Archived items are kept in the database instead of being permanently deleted.</p>
+    <h2>Content Structure</h2><p class="admin-note">Add, rename, duplicate or archive years and grades. Add, duplicate, edit or hide units. Archived content stays in the database.</p>
     <div class="admin-form-grid"><label>New year<input id="newYear" placeholder="2027"></label><div style="display:flex;align-items:end"><button id="addYear" class="btn btn-accent">+ Year</button></div></div>
     <hr class="soft">
     <div class="admin-form-grid"><label>Year<select id="structureYear">${yearOptions}</select></label><label>New grade<input id="newGrade" placeholder="Grade 3"></label><div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div></div>
     <hr class="soft">
     <div class="admin-form-grid"><label>Year<select id="unitYear">${yearOptions}</select></label><label>Grade<select id="unitGrade"></select></label><label>Unit name<input id="newUnitName" placeholder="Unit 3"></label><label>Unit title<input id="newUnitTitle" placeholder="At School"></label><div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div></div>
-    <hr class="soft"><h3>Current structure</h3><div id="structureTree" class="structure-tree"></div>`;
+    <div class="admin-form-grid" style="margin-top:.55em"><label>Create units from<input id="bulkFrom" type="number" min="1" value="1"></label><label>to<input id="bulkTo" type="number" min="1" value="10"></label><div class="wide"><button id="bulkUnits" class="btn btn-ghost">Bulk Create Units</button></div></div>
+    <hr class="soft"><h3>Current structure</h3><div id="structureTree" class="structure-tree"></div>
+    <hr class="soft"><h3>Archived / Hidden</h3><div id="archivedTree" class="manage-list">Loading…</div>`;
   const unitYear=panel.querySelector('#unitYear'), unitGrade=panel.querySelector('#unitGrade');
   const fillUnitGrades=()=>{unitGrade.innerHTML=state.grades.filter(g=>g.school_year_id===unitYear.value).map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');};
   unitYear.addEventListener('change',fillUnitGrades); fillUnitGrades();
-  panel.querySelector('#addYear').addEventListener('click',async()=>{ const name=panel.querySelector('#newYear').value.trim(); if(!name)return; const {error}=await state.client.from('school_years').insert({name,sort_order:Number(name)||9999,archived:false}); if(error)toast(error.message);else await adminStructureRefresh('Year added.'); });
-  panel.querySelector('#addGrade').addEventListener('click',async()=>{ const name=panel.querySelector('#newGrade').value.trim(),school_year_id=panel.querySelector('#structureYear').value; if(!name||!school_year_id)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {error}=await state.client.from('grades').insert({school_year_id,name,sort_order:order,archived:false}); if(error)toast(error.message);else await adminStructureRefresh('Grade added.'); });
-  panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {error}=await state.client.from('units').insert({grade_id,name,title,sort_order:order,is_published:true}); if(error)toast(error.message);else await adminStructureRefresh('Unit added.'); });
+  panel.querySelector('#addYear').addEventListener('click',async()=>{ const name=panel.querySelector('#newYear').value.trim(); if(!name)return; const {data,error}=await state.client.from('school_years').insert({name,sort_order:Number(name)||9999,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('year_created','year',data.id,{name});await adminStructureRefresh('Year added.');} });
+  panel.querySelector('#addGrade').addEventListener('click',async()=>{ const name=panel.querySelector('#newGrade').value.trim(),school_year_id=panel.querySelector('#structureYear').value; if(!name||!school_year_id)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {data,error}=await state.client.from('grades').insert({school_year_id,name,sort_order:order,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('grade_created','grade',data.id,{name});await adminStructureRefresh('Grade added.');} });
+  panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {data,error}=await state.client.from('units').insert({grade_id,name,title:title||null,sort_order:order,is_published:true}).select().single(); if(error)toast(error.message);else{await logAudit('unit_created','unit',data.id,{name,grade_id});await adminStructureRefresh('Unit added.');} });
+  panel.querySelector('#bulkUnits').addEventListener('click',async()=>{
+    const grade_id=unitGrade.value, from=Number(panel.querySelector('#bulkFrom').value), to=Number(panel.querySelector('#bulkTo').value);
+    if(!grade_id||!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to-from>50)return toast('Choose a grade and a valid range of up to 50 units.');
+    const rows=[]; for(let n=from;n<=to;n++)rows.push({grade_id,name:`Unit ${n}`,sort_order:n,is_published:true});
+    const {error}=await state.client.from('units').upsert(rows,{onConflict:'grade_id,name',ignoreDuplicates:true}); if(error)toast(error.message);else{await logAudit('units_bulk_created','grade',grade_id,{from,to});await adminStructureRefresh('Units created.');}
+  });
   renderStructureTree(panel.querySelector('#structureTree'));
+  renderArchivedStructure(panel.querySelector('#archivedTree'));
 }
 
 function renderStructureTree(tree) {
   tree.innerHTML='';
   state.years.forEach(year=>{
     const y=document.createElement('div'); y.className='structure-year';
-    y.innerHTML=`<div class="structure-row"><strong>📚 ${escapeHtml(year.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-year>Rename</button><button class="btn btn-small btn-danger" data-archive-year>Archive</button></div></div><div data-grades></div>`;
+    y.innerHTML=`<div class="structure-row"><strong>📚 ${escapeHtml(year.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-year>Rename</button><button class="btn btn-small btn-ghost" data-copy-year>Duplicate</button><button class="btn btn-small btn-danger" data-archive-year>Archive</button></div></div><div data-grades></div>`;
     y.querySelector('[data-rename-year]').addEventListener('click',()=>renameItem('school_years',year,'Year'));
+    y.querySelector('[data-copy-year]').addEventListener('click',()=>duplicateYear(year));
     y.querySelector('[data-archive-year]').addEventListener('click',()=>archiveItem('school_years',year,'Year'));
     const gradesWrap=y.querySelector('[data-grades]');
     state.grades.filter(g=>g.school_year_id===year.id).forEach(grade=>{
       const g=document.createElement('div'); g.className='structure-grade';
-      g.innerHTML=`<div class="structure-row"><strong>🎒 ${escapeHtml(grade.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-grade>Rename</button><button class="btn btn-small btn-danger" data-archive-grade>Archive</button></div></div><div data-units></div>`;
+      g.innerHTML=`<div class="structure-row"><strong>🎒 ${escapeHtml(grade.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-grade>Rename</button><button class="btn btn-small btn-ghost" data-copy-grade>Duplicate</button><button class="btn btn-small btn-danger" data-archive-grade>Archive</button></div></div><div data-units></div>`;
       g.querySelector('[data-rename-grade]').addEventListener('click',()=>renameItem('grades',grade,'Grade'));
+      g.querySelector('[data-copy-grade]').addEventListener('click',()=>duplicateGrade(grade));
       g.querySelector('[data-archive-grade]').addEventListener('click',()=>archiveItem('grades',grade,'Grade'));
       const unitsWrap=g.querySelector('[data-units]');
       state.units.filter(u=>u.grade_id===grade.id).forEach(unit=>{
         const u=document.createElement('div'); u.className='structure-unit';
-        u.innerHTML=`<span>⭐ <strong>${escapeHtml(unit.name)}</strong>${unit.title?` — ${escapeHtml(unit.title)}`:''}</span><div class="structure-actions"><button class="btn btn-small btn-ghost" data-edit-unit>Edit</button><button class="btn btn-small btn-danger" data-hide-unit>Hide</button></div>`;
+        u.innerHTML=`<span>⭐ <strong>${escapeHtml(unit.name)}</strong>${unit.title?` — ${escapeHtml(unit.title)}`:''}</span><div class="structure-actions"><button class="btn btn-small btn-ghost" data-edit-unit>Edit</button><button class="btn btn-small btn-ghost" data-copy-unit>Duplicate</button><button class="btn btn-small btn-danger" data-hide-unit>Hide</button></div>`;
         u.querySelector('[data-edit-unit]').addEventListener('click',()=>editUnit(unit));
+        u.querySelector('[data-copy-unit]').addEventListener('click',()=>duplicateUnit(unit));
         u.querySelector('[data-hide-unit]').addEventListener('click',()=>hideUnit(unit));
         unitsWrap.appendChild(u);
       });
@@ -544,33 +833,192 @@ function renderStructureTree(tree) {
   });
 }
 
+async function renderArchivedStructure(container) {
+  const [years,grades,units]=await Promise.all([
+    state.client.from('school_years').select('*').eq('archived',true).order('sort_order'),
+    state.client.from('grades').select('*').eq('archived',true).order('sort_order'),
+    state.client.from('units').select('*').eq('is_published',false).order('sort_order')
+  ]);
+  if(state.adminTab!=='structure')return;
+  const items=[];
+  (years.data||[]).forEach(x=>items.push({label:`Year ${x.name}`,table:'school_years',id:x.id,patch:{archived:false}}));
+  (grades.data||[]).forEach(x=>items.push({label:`Grade ${x.name}`,table:'grades',id:x.id,patch:{archived:false}}));
+  (units.data||[]).forEach(x=>items.push({label:`Unit ${x.name}`,table:'units',id:x.id,patch:{is_published:true}}));
+  container.innerHTML='';
+  if(!items.length){container.innerHTML='<p class="admin-note">Nothing archived or hidden.</p>';return;}
+  items.forEach(item=>{
+    const card=document.createElement('div');card.className='manage-card';card.innerHTML=`<strong>${escapeHtml(item.label)}</strong><button class="btn btn-small btn-accent">Restore</button>`;
+    card.querySelector('button').addEventListener('click',async()=>{const {error}=await state.client.from(item.table).update(item.patch).eq('id',item.id);if(error)toast(error.message);else{await logAudit('content_restored',item.table,item.id,{});await adminStructureRefresh('Item restored.');}});
+    container.appendChild(card);
+  });
+}
+
 async function renameItem(table,item,label) {
   const name=prompt(`${label} name`,item.name); if(name===null||!name.trim())return;
   const order=label==='Year'?(Number(name)||item.sort_order):Number((name.match(/\d+/)||[item.sort_order||99])[0]);
-  const {error}=await state.client.from(table).update({name:name.trim(),sort_order:order}).eq('id',item.id); if(error)toast(error.message);else await adminStructureRefresh(`${label} renamed.`);
+  const {error}=await state.client.from(table).update({name:name.trim(),sort_order:order}).eq('id',item.id); if(error)toast(error.message);else{await logAudit(`${label.toLowerCase()}_renamed`,label.toLowerCase(),item.id,{name:name.trim()});await adminStructureRefresh(`${label} renamed.`);}
 }
 async function archiveItem(table,item,label) {
   if(!confirm(`Archive ${item.name}? It will disappear from the normal portal but data will be kept.`))return;
-  const {error}=await state.client.from(table).update({archived:true}).eq('id',item.id); if(error)toast(error.message);else await adminStructureRefresh(`${label} archived.`);
+  const {error}=await state.client.from(table).update({archived:true}).eq('id',item.id); if(error)toast(error.message);else{await logAudit(`${label.toLowerCase()}_archived`,label.toLowerCase(),item.id,{name:item.name});await adminStructureRefresh(`${label} archived.`);}
 }
 async function editUnit(unit) {
   const name=prompt('Unit name',unit.name); if(name===null||!name.trim())return;
   const title=prompt('Unit title (optional)',unit.title||''); if(title===null)return;
   const order=Number((name.match(/\d+/)||[unit.sort_order||99])[0]);
-  const {error}=await state.client.from('units').update({name:name.trim(),title:title.trim()||null,sort_order:order}).eq('id',unit.id); if(error)toast(error.message);else await adminStructureRefresh('Unit updated.');
+  const {error}=await state.client.from('units').update({name:name.trim(),title:title.trim()||null,sort_order:order}).eq('id',unit.id); if(error)toast(error.message);else{await logAudit('unit_updated','unit',unit.id,{name:name.trim()});await adminStructureRefresh('Unit updated.');}
 }
 async function hideUnit(unit) {
   if(!confirm(`Hide ${unit.name}?`))return;
-  const {error}=await state.client.from('units').update({is_published:false}).eq('id',unit.id); if(error)toast(error.message);else await adminStructureRefresh('Unit hidden.');
+  const {error}=await state.client.from('units').update({is_published:false}).eq('id',unit.id); if(error)toast(error.message);else{await logAudit('unit_hidden','unit',unit.id,{name:unit.name});await adminStructureRefresh('Unit hidden.');}
+}
+
+async function duplicateYear(year) {
+  const newName=prompt('New year name',String(Number(year.name)||year.name)); if(newName===null||!newName.trim())return;
+  const {data:newYear,error}=await state.client.from('school_years').insert({name:newName.trim(),sort_order:Number(newName)||9999,archived:false}).select().single(); if(error)return toast(error.message);
+  const sourceGrades=state.grades.filter(g=>g.school_year_id===year.id);
+  for(const grade of sourceGrades){
+    const {data:newGrade,error:gErr}=await state.client.from('grades').insert({school_year_id:newYear.id,name:grade.name,sort_order:grade.sort_order,archived:false}).select().single(); if(gErr)continue;
+    const sourceUnits=state.units.filter(u=>u.grade_id===grade.id);
+    if(sourceUnits.length)await state.client.from('units').insert(sourceUnits.map(u=>({grade_id:newGrade.id,name:u.name,title:u.title,sort_order:u.sort_order,is_published:true})));
+  }
+  await logAudit('year_duplicated','year',newYear.id,{source:year.id}); await adminStructureRefresh('Year structure duplicated.');
+}
+async function duplicateGrade(grade) {
+  const name=prompt('Name for duplicated grade',`${grade.name} Copy`); if(name===null||!name.trim())return;
+  const {data:newGrade,error}=await state.client.from('grades').insert({school_year_id:grade.school_year_id,name:name.trim(),sort_order:(grade.sort_order||0)+1,archived:false}).select().single(); if(error)return toast(error.message);
+  const sourceUnits=state.units.filter(u=>u.grade_id===grade.id);
+  if(sourceUnits.length)await state.client.from('units').insert(sourceUnits.map(u=>({grade_id:newGrade.id,name:u.name,title:u.title,sort_order:u.sort_order,is_published:true})));
+  await logAudit('grade_duplicated','grade',newGrade.id,{source:grade.id}); await adminStructureRefresh('Grade duplicated.');
+}
+async function duplicateUnit(unit) {
+  const name=prompt('Name for duplicated unit',`${unit.name} Copy`); if(name===null||!name.trim())return;
+  const {data:newUnit,error}=await state.client.from('units').insert({grade_id:unit.grade_id,name:name.trim(),title:unit.title,sort_order:(unit.sort_order||0)+1,is_published:true}).select().single(); if(error)return toast(error.message);
+  if(confirm('Copy the activities from the original unit too?')){
+    const {data:activities}=await state.client.from('activities').select('*').eq('unit_id',unit.id);
+    if(activities?.length)await state.client.from('activities').insert(activities.map(a=>({unit_id:newUnit.id,title:a.title,type:a.type,launch_url:a.launch_url,thumbnail_url:a.thumbnail_url,sort_order:a.sort_order,published:a.published})));
+  }
+  await logAudit('unit_duplicated','unit',newUnit.id,{source:unit.id}); await adminStructureRefresh('Unit duplicated.');
 }
 async function adminStructureRefresh(message) { await loadStructure(); await loadOwnAccess(); toast(message); render(); }
 
+function renderAdminTools(panel) {
+  panel.innerHTML=`
+    <h2>Teacher / External Tools</h2><p class="admin-note">Add your separate EFL Lesson Planner or any other website. The tool opens in a new browser tab and remains technically separate from this portal.</p>
+    <div class="admin-form-grid">
+      <label>Name<input id="toolName" placeholder="EFL Lesson Planner"></label>
+      <label>Icon<input id="toolIcon" value="📝" maxlength="8"></label>
+      <label class="wide">Description<input id="toolDescription" placeholder="Create EFL lesson plans"></label>
+      <label class="wide">URL<input id="toolUrl" type="url" placeholder="https://planner.example.com"></label>
+      <label>Audience<select id="toolAudience"><option value="all_members">All members</option><option value="staff_only">Admin + Owner only</option><option value="owner_only">Owner only</option></select></label>
+      <label>Order<input id="toolOrder" type="number" value="10"></label>
+      <div class="wide"><button id="addTool" class="btn btn-accent">+ Add Tool</button></div>
+    </div><hr class="soft"><div id="toolManageList" class="manage-list"></div>`;
+  panel.querySelector('#addTool').addEventListener('click',async()=>{
+    const row={name:panel.querySelector('#toolName').value.trim(),icon:panel.querySelector('#toolIcon').value.trim()||'🧰',description:panel.querySelector('#toolDescription').value.trim()||null,url:panel.querySelector('#toolUrl').value.trim(),audience:panel.querySelector('#toolAudience').value,sort_order:Number(panel.querySelector('#toolOrder').value)||10,enabled:true};
+    if(!row.name||!row.url)return toast('Add a tool name and URL.');
+    const {data,error}=await state.client.from('external_tools').insert(row).select().single(); if(error)return toast(error.message);
+    await logAudit('external_tool_created','external_tool',data.id,{name:row.name}); await loadExternalTools(); toast('Tool added.'); render();
+  });
+  loadManagedTools(panel);
+}
+
+async function loadManagedTools(panel) {
+  const list=panel.querySelector('#toolManageList');
+  const {data,error}=await state.client.from('external_tools').select('*').order('sort_order').order('name');
+  if(error){list.textContent=error.message;return;} list.innerHTML='';
+  if(!data?.length){list.innerHTML='<p class="admin-note">No external tools yet.</p>';return;}
+  data.forEach(tool=>{
+    const card=document.createElement('div');card.className='manage-card';
+    card.innerHTML=`<div><strong>${escapeHtml(tool.icon)} ${escapeHtml(tool.name)}</strong><div class="meta">${escapeHtml(tool.audience)} · ${tool.enabled?'Enabled':'Disabled'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-toggle>${tool.enabled?'Disable':'Enable'}</button><button class="btn btn-small btn-danger" data-delete>Delete</button></div>`;
+    card.querySelector('[data-edit]').addEventListener('click',async()=>{
+      const name=prompt('Tool name',tool.name);if(name===null||!name.trim())return;const url=prompt('Tool URL',tool.url);if(url===null||!url.trim())return;
+      const {error:e}=await state.client.from('external_tools').update({name:name.trim(),url:url.trim()}).eq('id',tool.id);if(e)toast(e.message);else{await logAudit('external_tool_updated','external_tool',tool.id,{name:name.trim()});await loadExternalTools();loadManagedTools(panel);}
+    });
+    card.querySelector('[data-toggle]').addEventListener('click',async()=>{const {error:e}=await state.client.from('external_tools').update({enabled:!tool.enabled}).eq('id',tool.id);if(e)toast(e.message);else{await logAudit('external_tool_toggled','external_tool',tool.id,{enabled:!tool.enabled});await loadExternalTools();loadManagedTools(panel);}});
+    card.querySelector('[data-delete]').addEventListener('click',async()=>{if(!confirm(`Delete tool ${tool.name}?`))return;const {error:e}=await state.client.from('external_tools').delete().eq('id',tool.id);if(e)toast(e.message);else{await logAudit('external_tool_deleted','external_tool',tool.id,{name:tool.name});await loadExternalTools();loadManagedTools(panel);}});
+    list.appendChild(card);
+  });
+}
+
+function fontOptions(selected) { return FONT_OPTIONS.map(f=>option(f,f,selected)).join(''); }
+function themeOptions(selected) { return THEME_OPTIONS.map(([v,l])=>option(v,l,selected)).join(''); }
+
+function readDesignForm(panel) {
+  return {
+    ...state.settings,
+    portal_title:panel.querySelector('#designTitle').value.trim()||DEFAULT_SETTINGS.portal_title,
+    portal_subtitle:panel.querySelector('#designSubtitle').value.trim()||DEFAULT_SETTINGS.portal_subtitle,
+    brand_kicker:panel.querySelector('#designKicker').value.trim()||DEFAULT_SETTINGS.brand_kicker,
+    body_font:panel.querySelector('#designBodyFont').value,
+    heading_font:panel.querySelector('#designHeadingFont').value,
+    theme:panel.querySelector('#designTheme').value,
+    button_style:panel.querySelector('#designButtons').value,
+    menu_style:panel.querySelector('#designMenu').value,
+    board_opacity:Number(panel.querySelector('#designOpacity').value),
+    background_url:panel.querySelector('#designBackground').value.trim()||null,
+    accent_color:panel.querySelector('#designAccent').value,
+    primary_color:panel.querySelector('#designPrimary').value
+  };
+}
+
+function renderAdminDesign(panel) {
+  const s=state.settings;
+  panel.innerHTML=`
+    <h2>Design Studio</h2><p class="admin-note">Change the chalkboard interface without editing GitHub. Use Preview first; Save makes the design live for everyone.</p>
+    <div class="admin-form-grid">
+      <label>Portal title<input id="designTitle" value="${escapeHtml(s.portal_title||'')}"></label>
+      <label>Brand line<input id="designKicker" value="${escapeHtml(s.brand_kicker||'')}"></label>
+      <label class="wide">Subtitle<input id="designSubtitle" value="${escapeHtml(s.portal_subtitle||'')}"></label>
+      <label>Body font<select id="designBodyFont">${fontOptions(s.body_font)}</select></label>
+      <label>Heading font<select id="designHeadingFont">${fontOptions(s.heading_font)}</select></label>
+      <label>Theme<select id="designTheme">${themeOptions(s.theme)}</select></label>
+      <label>Button style<select id="designButtons">${option('rounded3d','Rounded 3D',s.button_style)}${option('pill','Soft Pill',s.button_style)}${option('flat','Flat',s.button_style)}${option('chalk','Chalk',s.button_style)}</select></label>
+      <label>Menu layout<select id="designMenu">${option('cards','Cards',s.menu_style)}${option('large','Large Tiles',s.menu_style)}${option('compact','Compact',s.menu_style)}</select></label>
+      <label>Board opacity<div class="range-line"><input id="designOpacity" type="range" min="0.70" max="1" step="0.01" value="${Number(s.board_opacity||1)}"><span id="opacityValue">${Math.round(Number(s.board_opacity||1)*100)}%</span></div></label>
+      <label>Primary color<input id="designPrimary" type="color" value="${escapeHtml(s.primary_color||DEFAULT_SETTINGS.primary_color)}"></label>
+      <label>Accent color<input id="designAccent" type="color" value="${escapeHtml(s.accent_color||DEFAULT_SETTINGS.accent_color)}"></label>
+      <label class="wide">Custom classroom background URL<input id="designBackground" type="url" placeholder="Leave blank for the current classroom" value="${escapeHtml(s.background_url||'')}"></label>
+    </div>
+    <div class="design-preview"><div class="brand-kicker">LIVE PREVIEW</div><div class="preview-title">${escapeHtml(s.portal_title||'Learning Hub')}</div><p class="admin-note">Changes below can be previewed on the real board before saving.</p></div>
+    <div class="button-row"><button id="previewDesign" class="btn btn-ghost">Preview</button><button id="saveDesign" class="btn btn-accent">Save Design</button><button id="resetDesign" class="btn btn-danger">Reset Default</button></div>`;
+  panel.querySelector('#designOpacity').addEventListener('input',e=>panel.querySelector('#opacityValue').textContent=`${Math.round(Number(e.target.value)*100)}%`);
+  panel.querySelector('#previewDesign').addEventListener('click',()=>{const draft=readDesignForm(panel);applyDesign(draft);panel.querySelector('.preview-title').textContent=draft.portal_title;toast('Preview applied. Nothing is saved yet.');});
+  panel.querySelector('#saveDesign').addEventListener('click',async()=>{
+    const draft=readDesignForm(panel);
+    const patch={portal_title:draft.portal_title,portal_subtitle:draft.portal_subtitle,brand_kicker:draft.brand_kicker,body_font:draft.body_font,heading_font:draft.heading_font,theme:draft.theme,button_style:draft.button_style,menu_style:draft.menu_style,board_opacity:draft.board_opacity,background_url:draft.background_url,accent_color:draft.accent_color,primary_color:draft.primary_color,updated_at:new Date().toISOString(),updated_by:state.session.user.id};
+    const {error}=await state.client.from('portal_settings').update(patch).eq('id',1);if(error)return toast(error.message);
+    Object.assign(state.settings,patch);applyDesign(state.settings);await logAudit('design_updated','portal_settings','1',{});toast('Design saved.');
+  });
+  panel.querySelector('#resetDesign').addEventListener('click',async()=>{
+    if(!confirm('Reset the visual settings to the default classroom design?'))return;
+    const patch={...DEFAULT_SETTINGS,registration_enabled:state.settings.registration_enabled,updated_at:new Date().toISOString(),updated_by:state.session.user.id};
+    delete patch.community_enabled;
+    const {error}=await state.client.from('portal_settings').update(patch).eq('id',1);if(error)return toast(error.message);
+    state.settings={...state.settings,...patch};applyDesign(state.settings);await logAudit('design_reset','portal_settings','1',{});toast('Default design restored.');render();
+  });
+}
+
 function renderAdminSettings(panel) {
-  panel.innerHTML=`<h2>Settings</h2><div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin can create users.<br>ON: visitors can request an account, but every new account remains Pending until you approve it.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.registrationEnabled?'checked':''}><span class="slider"></span></label></div></div><p class="admin-note" style="margin-top:.7em">Recommended: keep registration OFF until you are ready to accept new users. New approved users receive no unit access automatically.</p>`;
+  panel.innerHTML=`<h2>Settings</h2><div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin/Owner can create users.<br>ON: visitors can request an account, but every new account remains Pending until approved.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.settings.registration_enabled?'checked':''}><span class="slider"></span></label></div></div><p class="admin-note" style="margin-top:.7em">Recommended: keep registration OFF until you are ready to accept new users. Approved users receive no unit access automatically.</p>`;
   panel.querySelector('#registrationToggle').addEventListener('change',async(e)=>{
     const value=e.target.checked;
     const {error}=await state.client.from('portal_settings').update({registration_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
-    if(error){e.target.checked=!value;return toast(error.message);} state.registrationEnabled=value; toast(`Public registration ${value?'enabled':'disabled'}.`);
+    if(error){e.target.checked=!value;return toast(error.message);} state.settings.registration_enabled=value;await logAudit('registration_toggled','portal_settings','1',{enabled:value});toast(`Public registration ${value?'enabled':'disabled'}.`);
+  });
+}
+
+async function renderAdminAudit(panel) {
+  panel.innerHTML='<h2>Audit Log</h2><p class="admin-note">Recent administrative changes. This is useful when more than one administrator manages the portal.</p><div id="auditList" class="audit-list">Loading…</div>';
+  const {data,error}=await state.client.from('audit_log').select('*').order('created_at',{ascending:false}).limit(100);
+  if(state.adminTab!=='audit')return;
+  const list=panel.querySelector('#auditList');if(error){list.textContent=error.message;return;}list.innerHTML='';
+  if(!data?.length){list.innerHTML='<p class="admin-note">No audit entries yet.</p>';return;}
+  const users=new Map(state.adminUsers.map(u=>[u.id,u.username]));
+  data.forEach(row=>{
+    const card=document.createElement('div');card.className='audit-card';
+    card.innerHTML=`<strong>${escapeHtml(row.action)}</strong><div class="meta">${escapeHtml(row.entity_type||'')} ${escapeHtml(row.entity_id||'')}</div><div class="audit-time">${escapeHtml(users.get(row.actor_id)||'system')} · ${new Date(row.created_at).toLocaleString()}</div>`;
+    list.appendChild(card);
   });
 }
 

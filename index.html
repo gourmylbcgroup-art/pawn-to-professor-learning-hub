@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#0d6f4f" />
   <title>Pawn to Professor Learning Hub</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Baloo+2:wght@500;700;800&family=Comic+Neue:wght@400;700&family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;700;800&family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -18,9 +21,9 @@
 
       <section id="loginView" class="view hidden">
         <div class="brand">
-          <div class="brand-kicker">PAWN TO PROFESSOR</div>
-          <h1>Learning Hub</h1>
-          <p>Choose your grade. Open your unit. Start learning.</p>
+          <div id="loginBrandKicker" class="brand-kicker">PAWN TO PROFESSOR</div>
+          <h1 id="loginPortalTitle">Learning Hub</h1>
+          <p id="loginPortalSubtitle">Choose your grade. Open your unit. Start learning.</p>
         </div>
 
         <form id="loginForm" class="login-card">
@@ -66,7 +69,7 @@
       <section id="portalView" class="view hidden">
         <header class="board-header">
           <div>
-            <div class="brand-kicker">PAWN TO PROFESSOR</div>
+            <div id="headerBrandKicker" class="brand-kicker">PAWN TO PROFESSOR</div>
             <h1 id="pageTitle">Learning Hub</h1>
           </div>
           <div class="header-actions">
