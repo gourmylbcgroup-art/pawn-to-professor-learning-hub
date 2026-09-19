@@ -5,6 +5,6 @@ export default function handler(req, res) {
   if (!supabaseUrl || !supabaseAnonKey) {
     return res.status(500).json({ error: 'SUPABASE_URL and SUPABASE_ANON_KEY must be configured in Vercel.' });
   }
-  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
   return res.status(200).json({ supabaseUrl, supabaseAnonKey });
 }

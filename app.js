@@ -3,11 +3,21 @@
 const els = {
   loading: document.getElementById('loadingView'),
   loginView: document.getElementById('loginView'),
+  registerView: document.getElementById('registerView'),
   portalView: document.getElementById('portalView'),
   loginForm: document.getElementById('loginForm'),
   loginUsername: document.getElementById('loginUsername'),
   loginPassword: document.getElementById('loginPassword'),
   loginMessage: document.getElementById('loginMessage'),
+  openRegisterBtn: document.getElementById('openRegisterBtn'),
+  registerForm: document.getElementById('registerForm'),
+  registerUsername: document.getElementById('registerUsername'),
+  registerName: document.getElementById('registerName'),
+  registerEmail: document.getElementById('registerEmail'),
+  registerPassword: document.getElementById('registerPassword'),
+  registerPassword2: document.getElementById('registerPassword2'),
+  registerMessage: document.getElementById('registerMessage'),
+  backToLoginBtn: document.getElementById('backToLoginBtn'),
   pageTitle: document.getElementById('pageTitle'),
   breadcrumb: document.getElementById('breadcrumb'),
   content: document.getElementById('contentArea'),
@@ -21,6 +31,7 @@ const state = {
   client: null,
   session: null,
   profile: null,
+  registrationEnabled: false,
   years: [],
   grades: [],
   units: [],
@@ -29,7 +40,7 @@ const state = {
   year: null,
   grade: null,
   unit: null,
-  adminTab: 'users',
+  adminTab: 'requests',
   adminUsers: [],
   selectedAdminUser: null
 };
@@ -41,7 +52,6 @@ function loginIdentifierToEmail(value) {
   if (clean.includes('@')) return clean;
   return `${clean.replace(/[^a-z0-9._-]/g, '')}@${aliasDomain}`;
 }
-
 function show(el) { el.classList.remove('hidden'); }
 function hide(el) { el.classList.add('hidden'); }
 function escapeHtml(value = '') {
@@ -53,7 +63,11 @@ function toast(message) {
   el.className = 'toast';
   el.textContent = message;
   document.getElementById('boardApp').appendChild(el);
-  setTimeout(() => el.remove(), 2800);
+  setTimeout(() => el.remove(), 3000);
+}
+function shortDate(value) {
+  if (!value) return '—';
+  try { return new Date(value).toLocaleDateString(); } catch { return '—'; }
 }
 
 async function boot() {
@@ -65,12 +79,10 @@ async function boot() {
       auth: { persistSession: true, autoRefreshToken: true }
     });
 
+    await loadPublicSettings();
     const { data } = await state.client.auth.getSession();
     state.session = data.session;
-
-    state.client.auth.onAuthStateChange((_event, session) => {
-      state.session = session;
-    });
+    state.client.auth.onAuthStateChange((_event, session) => { state.session = session; });
 
     if (state.session) await enterPortal();
     else showLogin();
@@ -81,12 +93,56 @@ async function boot() {
   }
 }
 
-function showLogin() {
-  hide(els.loading);
-  hide(els.portalView);
-  show(els.loginView);
+async function loadPublicSettings() {
+  const { data, error } = await state.client
+    .from('portal_settings')
+    .select('registration_enabled')
+    .eq('id', 1)
+    .maybeSingle();
+  state.registrationEnabled = !error && !!data?.registration_enabled;
+}
+
+function showLogin(message = '') {
+  hide(els.loading); hide(els.portalView); hide(els.registerView); show(els.loginView);
+  els.loginMessage.textContent = message;
+  state.registrationEnabled ? show(els.openRegisterBtn) : hide(els.openRegisterBtn);
   els.loginUsername.focus();
 }
+function showRegister() {
+  hide(els.loginView); hide(els.portalView); show(els.registerView);
+  els.registerMessage.textContent = '';
+  els.registerUsername.focus();
+}
+
+els.openRegisterBtn.addEventListener('click', showRegister);
+els.backToLoginBtn.addEventListener('click', () => showLogin());
+
+els.registerForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = els.registerPassword.value;
+  if (password !== els.registerPassword2.value) {
+    els.registerMessage.textContent = 'The two passwords do not match.';
+    return;
+  }
+  els.registerMessage.textContent = 'Sending request…';
+  const res = await fetch('/api/register-request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: els.registerUsername.value,
+      displayName: els.registerName.value,
+      email: els.registerEmail.value,
+      password
+    })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    els.registerMessage.textContent = body.error || 'Registration could not be completed.';
+    return;
+  }
+  els.registerForm.reset();
+  showLogin('Registration received. Your account is waiting for administrator approval.');
+});
 
 els.loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -105,7 +161,8 @@ els.loginForm.addEventListener('submit', async (e) => {
 
 els.logoutBtn.addEventListener('click', async () => {
   await state.client.auth.signOut();
-  Object.assign(state, { session:null, profile:null, view:'years', year:null, grade:null, unit:null });
+  Object.assign(state, { session:null, profile:null, view:'years', year:null, grade:null, unit:null, selectedAdminUser:null });
+  await loadPublicSettings();
   showLogin();
 });
 
@@ -119,33 +176,28 @@ els.backBtn.addEventListener('click', () => {
 
 els.adminBtn.addEventListener('click', async () => {
   state.view = 'admin';
-  state.adminTab = 'users';
+  state.adminTab = 'requests';
   await loadAdminUsers();
   render();
 });
 
 async function enterPortal() {
-  hide(els.loading);
-  hide(els.loginView);
-
+  hide(els.loading); hide(els.loginView); hide(els.registerView);
   const uid = state.session.user.id;
-  const { data: profile, error } = await state.client
-    .from('profiles')
-    .select('*')
-    .eq('id', uid)
-    .single();
-
+  const { data: profile, error } = await state.client.from('profiles').select('*').eq('id', uid).single();
   if (error || !profile) {
     await state.client.auth.signOut();
-    els.loginMessage.textContent = 'Your profile is not ready. Ask the administrator.';
-    showLogin();
+    showLogin('Your profile is not ready. Ask the administrator.');
     return;
   }
   const expired = profile.expires_at && new Date(profile.expires_at) <= new Date();
   if (profile.status !== 'active' || expired) {
     await state.client.auth.signOut();
-    els.loginMessage.textContent = expired ? 'This account has expired.' : 'This account is inactive.';
-    showLogin();
+    const msg = expired ? 'This account has expired.'
+      : profile.status === 'pending' ? 'Your registration is waiting for administrator approval.'
+      : profile.status === 'rejected' ? 'This registration request was not approved.'
+      : 'This account is inactive.';
+    showLogin(msg);
     return;
   }
 
@@ -158,8 +210,8 @@ async function enterPortal() {
 
 async function loadStructure() {
   const [years, grades, units] = await Promise.all([
-    state.client.from('school_years').select('*').order('sort_order'),
-    state.client.from('grades').select('*').order('sort_order'),
+    state.client.from('school_years').select('*').eq('archived', false).order('sort_order'),
+    state.client.from('grades').select('*').eq('archived', false).order('sort_order'),
     state.client.from('units').select('*').eq('is_published', true).order('sort_order')
   ]);
   if (years.error || grades.error || units.error) throw years.error || grades.error || units.error;
@@ -173,15 +225,10 @@ async function loadOwnAccess() {
     state.ownAccess = new Set(state.units.map(u => u.id));
     return;
   }
-  const { data, error } = await state.client
-    .from('user_unit_access')
-    .select('unit_id, expires_at')
-    .eq('user_id', state.session.user.id);
+  const { data, error } = await state.client.from('user_unit_access').select('unit_id, expires_at').eq('user_id', state.session.user.id);
   if (error) throw error;
   const now = Date.now();
-  state.ownAccess = new Set((data || [])
-    .filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now)
-    .map(r => r.unit_id));
+  state.ownAccess = new Set((data || []).filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now).map(r => r.unit_id));
 }
 
 function setHeader(title, crumbs = []) {
@@ -196,10 +243,7 @@ function makeTile({ icon, title, subtitle, locked = false, onClick }) {
   node.querySelector('.tile-icon').textContent = icon;
   node.querySelector('.tile-title').textContent = title;
   node.querySelector('.tile-subtitle').textContent = subtitle || '';
-  if (locked) {
-    node.classList.add('locked');
-    node.querySelector('.lock-badge').classList.remove('hidden');
-  }
+  if (locked) { node.classList.add('locked'); node.querySelector('.lock-badge').classList.remove('hidden'); }
   node.addEventListener('click', onClick);
   return node;
 }
@@ -215,86 +259,53 @@ function render() {
 
 function renderYears() {
   setHeader(`Welcome, ${state.profile.display_name || state.profile.username || 'Teacher'}`, []);
-  const grid = document.createElement('div');
-  grid.className = 'tile-grid';
+  const grid = document.createElement('div'); grid.className = 'tile-grid';
   for (const year of state.years) {
     const grades = state.grades.filter(g => g.school_year_id === year.id);
-    grid.appendChild(makeTile({
-      icon: '📚', title: year.name, subtitle: `${grades.length} grades`,
-      onClick: () => { state.year = year; state.view = 'grades'; render(); }
-    }));
+    grid.appendChild(makeTile({ icon:'📚', title:year.name, subtitle:`${grades.length} grades`, onClick:()=>{ state.year=year; state.view='grades'; render(); } }));
   }
   if (!state.years.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No school years yet.</strong><br>Ask the administrator to add one.</div></div>';
   else els.content.appendChild(grid);
 }
-
 function renderGrades() {
   setHeader('Choose a Grade', [state.year.name]);
-  const grid = document.createElement('div');
-  grid.className = 'tile-grid';
+  const grid = document.createElement('div'); grid.className = 'tile-grid';
   const grades = state.grades.filter(g => g.school_year_id === state.year.id);
   for (const grade of grades) {
     const units = state.units.filter(u => u.grade_id === grade.id);
     const unlockedCount = units.filter(u => state.ownAccess.has(u.id)).length;
-    grid.appendChild(makeTile({
-      icon: '🎒', title: grade.name,
-      subtitle: state.profile.role === 'admin' ? `${units.length} units` : `${unlockedCount}/${units.length} units open`,
-      onClick: () => { state.grade = grade; state.view = 'units'; render(); }
-    }));
+    grid.appendChild(makeTile({ icon:'🎒', title:grade.name, subtitle:state.profile.role==='admin'?`${units.length} units`:`${unlockedCount}/${units.length} units open`, onClick:()=>{ state.grade=grade; state.view='units'; render(); } }));
   }
   els.content.appendChild(grid);
 }
-
 function renderUnits() {
   setHeader('Choose a Unit', [state.year.name, state.grade.name]);
-  const grid = document.createElement('div');
-  grid.className = 'tile-grid';
+  const grid = document.createElement('div'); grid.className='tile-grid';
   const units = state.units.filter(u => u.grade_id === state.grade.id);
   for (const unit of units) {
     const locked = !state.ownAccess.has(unit.id);
     grid.appendChild(makeTile({
-      icon: locked ? '🔒' : '⭐',
-      title: unit.name,
-      subtitle: locked ? 'No access' : (unit.title || 'Open unit'),
-      locked,
-      onClick: () => {
-        if (locked) { toast('This unit is locked for this account.'); return; }
-        state.unit = unit; state.view = 'activities'; render();
-      }
+      icon:locked?'🔒':'⭐', title:unit.name, subtitle:locked?'No access':(unit.title||'Open unit'), locked,
+      onClick:()=>{ if (locked) return toast('This unit is locked for this account.'); state.unit=unit; state.view='activities'; render(); }
     }));
   }
   if (!units.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No units yet.</strong><br>The administrator can add units from Admin.</div></div>';
   else els.content.appendChild(grid);
 }
-
 async function renderActivities() {
   setHeader(state.unit.name, [state.year.name, state.grade.name, state.unit.name]);
   els.content.innerHTML = '<div class="empty-state">Loading activities…</div>';
-  const { data, error } = await state.client
-    .from('activities')
-    .select('*')
-    .eq('unit_id', state.unit.id)
-    .eq('published', true)
-    .order('sort_order');
+  const { data, error } = await state.client.from('activities').select('*').eq('unit_id', state.unit.id).eq('published', true).order('sort_order');
   if (state.view !== 'activities') return;
   els.content.innerHTML = '';
   if (error) { els.content.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; return; }
-  if (!data?.length) {
-    els.content.innerHTML = '<div class="empty-state"><div><strong>This unit is ready.</strong><br>No games have been added yet.</div></div>';
-    return;
-  }
-  const list = document.createElement('div');
-  list.className = 'activity-list';
+  if (!data?.length) { els.content.innerHTML = '<div class="empty-state"><div><strong>This unit is ready.</strong><br>No games have been added yet.</div></div>'; return; }
+  const list = document.createElement('div'); list.className = 'activity-list';
   data.forEach(a => {
-    const card = document.createElement('article');
-    card.className = 'activity-card';
+    const card = document.createElement('article'); card.className='activity-card';
     card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')}</p>`;
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.textContent = 'Play ▶';
-    btn.addEventListener('click', () => window.open(a.launch_url, '_blank', 'noopener,noreferrer'));
-    card.appendChild(btn);
-    list.appendChild(card);
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Play ▶'; btn.addEventListener('click',()=>window.open(a.launch_url,'_blank','noopener,noreferrer'));
+    card.appendChild(btn); list.appendChild(card);
   });
   els.content.appendChild(list);
 }
@@ -307,26 +318,52 @@ async function loadAdminUsers() {
 
 function renderAdmin() {
   setHeader('Administrator', ['Admin']);
-  const wrap = document.createElement('div');
-  wrap.className = 'admin-wrap';
+  const pendingCount = state.adminUsers.filter(u => u.status === 'pending').length;
+  const wrap = document.createElement('div'); wrap.className='admin-wrap';
   wrap.innerHTML = `
-    <aside class="admin-sidebar">
-      <div class="admin-tabs">
-        <button class="btn btn-ghost ${state.adminTab === 'users' ? 'active' : ''}" data-tab="users">👤 Users & Access</button>
-        <button class="btn btn-ghost ${state.adminTab === 'content' ? 'active' : ''}" data-tab="content">🎮 Activities</button>
-        <button class="btn btn-ghost ${state.adminTab === 'structure' ? 'active' : ''}" data-tab="structure">📚 Years / Grades / Units</button>
-      </div>
-    </aside>
+    <aside class="admin-sidebar"><div class="admin-tabs">
+      <button class="btn btn-ghost ${state.adminTab==='requests'?'active':''}" data-tab="requests">👥 Requests${pendingCount?` (${pendingCount})`:''}</button>
+      <button class="btn btn-ghost ${state.adminTab==='users'?'active':''}" data-tab="users">👤 Users & Access</button>
+      <button class="btn btn-ghost ${state.adminTab==='content'?'active':''}" data-tab="content">🎮 Activities</button>
+      <button class="btn btn-ghost ${state.adminTab==='structure'?'active':''}" data-tab="structure">📚 Content Structure</button>
+      <button class="btn btn-ghost ${state.adminTab==='settings'?'active':''}" data-tab="settings">⚙️ Settings</button>
+    </div></aside>
     <section class="admin-panel" id="adminPanel"></section>`;
   els.content.appendChild(wrap);
   wrap.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', async () => {
     state.adminTab = btn.dataset.tab;
-    if (state.adminTab === 'users') await loadAdminUsers();
+    await loadAdminUsers();
     render();
   }));
-  if (state.adminTab === 'users') renderAdminUsers(wrap.querySelector('#adminPanel'));
-  if (state.adminTab === 'content') renderAdminContent(wrap.querySelector('#adminPanel'));
-  if (state.adminTab === 'structure') renderAdminStructure(wrap.querySelector('#adminPanel'));
+  const panel = wrap.querySelector('#adminPanel');
+  if (state.adminTab === 'requests') renderAdminRequests(panel);
+  if (state.adminTab === 'users') renderAdminUsers(panel);
+  if (state.adminTab === 'content') renderAdminContent(panel);
+  if (state.adminTab === 'structure') renderAdminStructure(panel);
+  if (state.adminTab === 'settings') renderAdminSettings(panel);
+}
+
+function renderAdminRequests(panel) {
+  const pending = state.adminUsers.filter(u => u.status === 'pending');
+  panel.innerHTML = `<h2>Registration Requests</h2><p class="admin-note">Public registrations never receive content until you approve them.</p><div id="requestList"></div>`;
+  const list = panel.querySelector('#requestList');
+  if (!pending.length) { list.innerHTML = '<div class="empty-state" style="height:120px">No pending registrations.</div>'; return; }
+  pending.forEach(user => {
+    const card = document.createElement('div'); card.className='request-card';
+    card.innerHTML = `<header><div><strong>${escapeHtml(user.display_name || user.username)}</strong><br><small>${escapeHtml(user.username)} · ${escapeHtml(user.contact_email || 'No contact email')}</small></div><span class="status-pill pending">Pending</span></header><div class="request-actions" style="margin-top:.55em"><button class="btn btn-accent btn-small" data-approve>Approve</button><button class="btn btn-danger btn-small" data-reject>Reject</button></div>`;
+    card.querySelector('[data-approve]').addEventListener('click', async () => {
+      const { error } = await state.client.from('profiles').update({status:'active'}).eq('id', user.id);
+      if (error) return toast(error.message);
+      toast(`${user.username} approved. Now choose unit access in Users & Access.`); await loadAdminUsers(); render();
+    });
+    card.querySelector('[data-reject]').addEventListener('click', async () => {
+      if (!confirm(`Reject ${user.username}?`)) return;
+      const { error } = await state.client.from('profiles').update({status:'rejected'}).eq('id', user.id);
+      if (error) return toast(error.message);
+      toast('Registration rejected.'); await loadAdminUsers(); render();
+    });
+    list.appendChild(card);
+  });
 }
 
 function renderAdminUsers(panel) {
@@ -335,26 +372,23 @@ function renderAdminUsers(panel) {
     <div class="admin-form-grid">
       <label>Username<input id="newUsername" placeholder="teacher01"></label>
       <label>Display name<input id="newDisplayName" placeholder="Teacher Name"></label>
+      <label>Contact email<input id="newContactEmail" type="email" placeholder="teacher@example.com"></label>
       <label>Password<input id="newPassword" type="password" placeholder="Minimum 8 characters"></label>
-      <div style="display:flex;align-items:end"><button id="createUserBtn" class="btn btn-accent" type="button">+ Create User</button></div>
+      <div class="wide"><button id="createUserBtn" class="btn btn-accent" type="button">+ Create Active User</button></div>
     </div>
-    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
+    <hr class="soft">
     <div class="admin-form-grid" style="grid-template-columns:.75fr 1.25fr">
       <div><h3>Accounts</h3><div class="user-list" id="userList"></div></div>
       <div id="permissionEditor"><p class="admin-note">Select a user to control exactly which units they can open.</p></div>
     </div>`;
-
   panel.querySelector('#createUserBtn').addEventListener('click', createUserFromAdmin);
   const userList = panel.querySelector('#userList');
-  state.adminUsers.forEach(user => {
-    const row = document.createElement('button');
-    row.className = `user-row ${state.selectedAdminUser?.id === user.id ? 'active' : ''}`;
-    row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><small>${escapeHtml(user.role)}</small>`;
+  state.adminUsers.filter(u => u.status !== 'pending').forEach(user => {
+    const row = document.createElement('button'); row.className=`user-row ${state.selectedAdminUser?.id===user.id?'active':''}`;
+    row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><small>${escapeHtml(user.status)}</small>`;
     row.addEventListener('click', async () => {
-      state.selectedAdminUser = user;
-      renderAdminUserPermissions(panel.querySelector('#permissionEditor'), user);
-      userList.querySelectorAll('.user-row').forEach(x => x.classList.remove('active'));
-      row.classList.add('active');
+      state.selectedAdminUser=user; renderAdminUserPermissions(panel.querySelector('#permissionEditor'),user);
+      userList.querySelectorAll('.user-row').forEach(x=>x.classList.remove('active')); row.classList.add('active');
     });
     userList.appendChild(row);
   });
@@ -364,215 +398,180 @@ function renderAdminUsers(panel) {
 async function createUserFromAdmin() {
   const username = document.getElementById('newUsername').value.trim();
   const displayName = document.getElementById('newDisplayName').value.trim();
+  const contactEmail = document.getElementById('newContactEmail').value.trim();
   const password = document.getElementById('newPassword').value;
-  if (!username || password.length < 8) { toast('Add a username and a password of at least 8 characters.'); return; }
-
+  if (!username || password.length < 8) return toast('Add a username and a password of at least 8 characters.');
   const { data: { session } } = await state.client.auth.getSession();
-  const res = await fetch('/api/admin/create-user', {
-    method: 'POST',
-    headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
-    body: JSON.stringify({ username, displayName, password })
-  });
-  const body = await res.json();
-  if (!res.ok) { toast(body.error || 'Could not create user.'); return; }
-  toast(`User ${username} created.`);
-  state.selectedAdminUser = null;
-  await loadAdminUsers();
-  render();
+  const res = await fetch('/api/admin/create-user', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`}, body:JSON.stringify({username,displayName,contactEmail,password}) });
+  const body = await res.json().catch(()=>({}));
+  if (!res.ok) return toast(body.error || 'Could not create user.');
+  toast(`User ${username} created.`); state.selectedAdminUser=null; await loadAdminUsers(); render();
 }
 
 async function renderAdminUserPermissions(container, user) {
-  container.innerHTML = '<p class="admin-note">Loading access…</p>';
+  container.innerHTML='<p class="admin-note">Loading access…</p>';
   const { data: access, error } = await state.client.from('user_unit_access').select('*').eq('user_id', user.id);
-  if (error) { container.textContent = error.message; return; }
-  const checked = new Set((access || []).map(a => a.unit_id));
+  if (error) { container.textContent=error.message; return; }
+  const checked = new Set((access||[]).map(a=>a.unit_id));
   container.innerHTML = `
     <h3>${escapeHtml(user.username || '')}</h3>
-    <div class="admin-form-grid">
-      <label>Status<select id="userStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-      <label>Expiry date<input id="userExpiry" type="date"></label>
-    </div>
-    <div style="display:flex;gap:.45em;margin:.6em 0">
-      <button id="allAccess" class="btn btn-small btn-ghost">All Units</button>
-      <button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button>
-      <button id="clearAccess" class="btn btn-small btn-ghost">Clear</button>
-    </div>
-    <div id="permissionMatrix"></div>
-    <button id="savePermissions" class="btn btn-accent" type="button">Save Access</button>`;
-  container.querySelector('#userStatus').value = user.status || 'active';
+    <p class="admin-note">${escapeHtml(user.contact_email || 'No contact email')} · ${escapeHtml(user.role)}</p>
+    <div class="admin-form-grid"><label>Status<select id="userStatus"><option value="active">Active</option><option value="inactive">Inactive</option><option value="rejected">Rejected</option></select></label><label>Expiry date<input id="userExpiry" type="date"></label></div>
+    <div style="display:flex;gap:.45em;margin:.6em 0"><button id="allAccess" class="btn btn-small btn-ghost">All Units</button><button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button><button id="clearAccess" class="btn btn-small btn-ghost">Clear</button></div>
+    <div id="permissionMatrix"></div><button id="savePermissions" class="btn btn-accent" type="button">Save Access</button>`;
+  container.querySelector('#userStatus').value = ['active','inactive','rejected'].includes(user.status) ? user.status : 'inactive';
   if (user.expires_at) container.querySelector('#userExpiry').value = new Date(user.expires_at).toISOString().slice(0,10);
-
-  const matrix = container.querySelector('#permissionMatrix');
-  state.years.forEach(year => {
-    const y = document.createElement('div');
-    y.className = 'permission-group';
-    y.innerHTML = `<strong>${escapeHtml(year.name)}</strong>`;
-    state.grades.filter(g => g.school_year_id === year.id).forEach(grade => {
-      const units = state.units.filter(u => u.grade_id === grade.id);
-      const row = document.createElement('div');
-      row.innerHTML = `<div class="permission-grade"><span>${escapeHtml(grade.name)}</span><button class="btn btn-small btn-ghost" data-grade-all="${grade.id}">All</button></div>`;
-      const unitWrap = document.createElement('div');
-      unitWrap.className = 'permission-units';
-      units.forEach(unit => {
-        const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" data-unit-id="${unit.id}" ${checked.has(unit.id) ? 'checked' : ''}> ${escapeHtml(unit.name)}`;
-        unitWrap.appendChild(label);
-      });
-      row.appendChild(unitWrap);
-      y.appendChild(row);
-    });
-    matrix.appendChild(y);
+  const matrix=container.querySelector('#permissionMatrix');
+  state.years.forEach(year=>{
+    const y=document.createElement('div'); y.className='permission-group'; y.innerHTML=`<strong>${escapeHtml(year.name)}</strong>`;
+    state.grades.filter(g=>g.school_year_id===year.id).forEach(grade=>{
+      const units=state.units.filter(u=>u.grade_id===grade.id); const row=document.createElement('div');
+      row.innerHTML=`<div class="permission-grade"><span>${escapeHtml(grade.name)}</span><button class="btn btn-small btn-ghost" data-grade-all="${grade.id}">All</button></div>`;
+      const unitWrap=document.createElement('div'); unitWrap.className='permission-units';
+      units.forEach(unit=>{ const label=document.createElement('label'); label.innerHTML=`<input type="checkbox" data-unit-id="${unit.id}" ${checked.has(unit.id)?'checked':''}> ${escapeHtml(unit.name)}`; unitWrap.appendChild(label); });
+      row.appendChild(unitWrap); y.appendChild(row);
+    }); matrix.appendChild(y);
   });
-
-  container.querySelectorAll('[data-grade-all]').forEach(btn => btn.addEventListener('click', () => {
-    const gradeId = btn.dataset.gradeAll;
-    const ids = state.units.filter(u => u.grade_id === gradeId).map(u => u.id);
-    container.querySelectorAll('[data-unit-id]').forEach(cb => { if (ids.includes(cb.dataset.unitId)) cb.checked = true; });
+  container.querySelectorAll('[data-grade-all]').forEach(btn=>btn.addEventListener('click',()=>{
+    const ids=state.units.filter(u=>u.grade_id===btn.dataset.gradeAll).map(u=>u.id);
+    container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
   }));
-  container.querySelector('#allAccess').addEventListener('click', () => container.querySelectorAll('[data-unit-id]').forEach(cb => cb.checked = true));
-  container.querySelector('#clearAccess').addEventListener('click', () => container.querySelectorAll('[data-unit-id]').forEach(cb => cb.checked = false));
-  container.querySelector('#unit1All').addEventListener('click', () => {
-    container.querySelectorAll('[data-unit-id]').forEach(cb => {
-      const unit = state.units.find(u => u.id === cb.dataset.unitId);
-      if (unit?.name.trim().toLowerCase() === 'unit 1') cb.checked = true;
-    });
-  });
-  container.querySelector('#savePermissions').addEventListener('click', () => savePermissions(container, user));
+  container.querySelector('#allAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=true));
+  container.querySelector('#clearAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=false));
+  container.querySelector('#unit1All').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>{ const unit=state.units.find(u=>u.id===cb.dataset.unitId); if(unit?.name.trim().toLowerCase()==='unit 1') cb.checked=true; }));
+  container.querySelector('#savePermissions').addEventListener('click',()=>savePermissions(container,user));
 }
 
-async function savePermissions(container, user) {
-  const selected = [...container.querySelectorAll('[data-unit-id]:checked')].map(cb => cb.dataset.unitId);
-  const status = container.querySelector('#userStatus').value;
-  const expiryRaw = container.querySelector('#userExpiry').value;
-  const expiresAt = expiryRaw ? new Date(`${expiryRaw}T23:59:59`).toISOString() : null;
-
-  const { error: profileError } = await state.client.from('profiles').update({ status, expires_at: expiresAt }).eq('id', user.id);
-  if (profileError) { toast(profileError.message); return; }
-
-  const { error: deleteError } = await state.client.from('user_unit_access').delete().eq('user_id', user.id);
-  if (deleteError) { toast(deleteError.message); return; }
-
-  if (selected.length) {
-    const rows = selected.map(unitId => ({ user_id:user.id, unit_id:unitId, granted_by:state.session.user.id }));
-    const { error: insertError } = await state.client.from('user_unit_access').insert(rows);
-    if (insertError) { toast(insertError.message); return; }
-  }
-  user.status = status;
-  user.expires_at = expiresAt;
-  toast(`Access saved for ${user.username}.`);
+async function savePermissions(container,user) {
+  const selected=[...container.querySelectorAll('[data-unit-id]:checked')].map(cb=>cb.dataset.unitId);
+  const status=container.querySelector('#userStatus').value; const expiryRaw=container.querySelector('#userExpiry').value;
+  const expiresAt=expiryRaw?new Date(`${expiryRaw}T23:59:59`).toISOString():null;
+  const {error:profileError}=await state.client.from('profiles').update({status,expires_at:expiresAt}).eq('id',user.id);
+  if(profileError) return toast(profileError.message);
+  const {error:deleteError}=await state.client.from('user_unit_access').delete().eq('user_id',user.id);
+  if(deleteError) return toast(deleteError.message);
+  if(selected.length){ const rows=selected.map(unitId=>({user_id:user.id,unit_id:unitId,granted_by:state.session.user.id})); const {error:insertError}=await state.client.from('user_unit_access').insert(rows); if(insertError) return toast(insertError.message); }
+  user.status=status; user.expires_at=expiresAt; toast(`Access saved for ${user.username}.`);
 }
 
-function buildHierarchyOptions(selected = {}) {
-  const yearOptions = state.years.map(y => `<option value="${y.id}" ${selected.year === y.id ? 'selected' : ''}>${escapeHtml(y.name)}</option>`).join('');
-  return { yearOptions };
+function buildHierarchyOptions() {
+  return { yearOptions: state.years.map(y=>`<option value="${y.id}">${escapeHtml(y.name)}</option>`).join('') };
 }
 
 function renderAdminContent(panel) {
-  const { yearOptions } = buildHierarchyOptions();
-  panel.innerHTML = `
-    <h2>Add Game / Activity</h2>
+  const {yearOptions}=buildHierarchyOptions();
+  panel.innerHTML=`
+    <h2>Games & Activities</h2>
     <div class="admin-form-grid">
-      <label>Year<select id="activityYear">${yearOptions}</select></label>
-      <label>Grade<select id="activityGrade"></select></label>
-      <label>Unit<select id="activityUnit"></select></label>
-      <label>Type<select id="activityType"><option>Game</option><option>Interactive Lesson</option><option>Worksheet</option><option>Quiz</option></select></label>
+      <label>Year<select id="activityYear">${yearOptions}</select></label><label>Grade<select id="activityGrade"></select></label>
+      <label>Unit<select id="activityUnit"></select></label><label>Type<select id="activityType"><option>Game</option><option>Interactive Lesson</option><option>Worksheet</option><option>Quiz</option><option>External Link</option></select></label>
       <label class="wide">Title<input id="activityTitle" placeholder="Numbers Challenge"></label>
       <label class="wide">Launch URL<input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
       <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Activity</button></div>
-    </div>
-    <p class="admin-note">Tip: your existing game repositories can stay separate. Add each deployed game URL here and assign it to the correct year, grade and unit.</p>`;
+    </div><hr class="soft"><h3>Existing activities</h3><div id="activityManageList" class="manage-list"></div>`;
+  const yearSel=panel.querySelector('#activityYear'), gradeSel=panel.querySelector('#activityGrade'), unitSel=panel.querySelector('#activityUnit');
+  const refreshUnits=()=>{ const us=state.units.filter(u=>u.grade_id===gradeSel.value); unitSel.innerHTML=us.map(u=>`<option value="${u.id}">${escapeHtml(u.name)}</option>`).join(''); loadManagedActivities(panel); };
+  const refreshGrades=()=>{ const gs=state.grades.filter(g=>g.school_year_id===yearSel.value); gradeSel.innerHTML=gs.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join(''); refreshUnits(); };
+  yearSel.addEventListener('change',refreshGrades); gradeSel.addEventListener('change',refreshUnits); unitSel.addEventListener('change',()=>loadManagedActivities(panel)); refreshGrades();
+  panel.querySelector('#addActivity').addEventListener('click',async()=>{
+    const row={unit_id:unitSel.value,title:panel.querySelector('#activityTitle').value.trim(),type:panel.querySelector('#activityType').value,launch_url:panel.querySelector('#activityUrl').value.trim(),published:true,sort_order:10};
+    if(!row.unit_id||!row.title||!row.launch_url) return toast('Choose a unit and add a title and URL.');
+    const {error}=await state.client.from('activities').insert(row); if(error) toast(error.message); else { toast('Activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; loadManagedActivities(panel); }
+  });
+}
 
-  const yearSel = panel.querySelector('#activityYear');
-  const gradeSel = panel.querySelector('#activityGrade');
-  const unitSel = panel.querySelector('#activityUnit');
-  const refreshGrades = () => {
-    const gs = state.grades.filter(g => g.school_year_id === yearSel.value);
-    gradeSel.innerHTML = gs.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
-    refreshUnits();
-  };
-  const refreshUnits = () => {
-    const us = state.units.filter(u => u.grade_id === gradeSel.value);
-    unitSel.innerHTML = us.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
-  };
-  yearSel.addEventListener('change', refreshGrades);
-  gradeSel.addEventListener('change', refreshUnits);
-  refreshGrades();
-
-  panel.querySelector('#addActivity').addEventListener('click', async () => {
-    const row = {
-      unit_id: unitSel.value,
-      title: panel.querySelector('#activityTitle').value.trim(),
-      type: panel.querySelector('#activityType').value,
-      launch_url: panel.querySelector('#activityUrl').value.trim(),
-      published: true,
-      sort_order: 10
-    };
-    if (!row.unit_id || !row.title || !row.launch_url) { toast('Choose a unit and add a title and URL.'); return; }
-    const { error } = await state.client.from('activities').insert(row);
-    if (error) toast(error.message); else { toast('Activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; }
+async function loadManagedActivities(panel) {
+  const unitId=panel.querySelector('#activityUnit')?.value; const list=panel.querySelector('#activityManageList'); if(!unitId||!list){return;}
+  list.innerHTML='Loading…';
+  const {data,error}=await state.client.from('activities').select('*').eq('unit_id',unitId).order('sort_order');
+  if(error){list.textContent=error.message;return;} list.innerHTML='';
+  if(!data?.length){list.innerHTML='<p class="admin-note">No activities in this unit yet.</p>';return;}
+  data.forEach(a=>{
+    const card=document.createElement('div'); card.className='manage-card';
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    card.querySelector('[data-edit]').addEventListener('click',async()=>{
+      const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
+      const url=prompt('Launch URL',a.launch_url); if(url===null||!url.trim())return;
+      const {error:e}=await state.client.from('activities').update({title:title.trim(),launch_url:url.trim()}).eq('id',a.id); if(e)toast(e.message);else{toast('Activity updated.');loadManagedActivities(panel);}
+    });
+    card.querySelector('[data-toggle]').addEventListener('click',async()=>{ const {error:e}=await state.client.from('activities').update({published:!a.published}).eq('id',a.id); if(e)toast(e.message);else{toast(a.published?'Activity hidden.':'Activity published.');loadManagedActivities(panel);} });
+    list.appendChild(card);
   });
 }
 
 function renderAdminStructure(panel) {
-  const { yearOptions } = buildHierarchyOptions();
-  panel.innerHTML = `
-    <h2>School Structure</h2>
-    <div class="admin-form-grid">
-      <label>New year<input id="newYear" placeholder="2027"></label>
-      <div style="display:flex;align-items:end"><button id="addYear" class="btn btn-accent">+ Year</button></div>
-    </div>
-    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
-    <div class="admin-form-grid">
-      <label>Year<select id="structureYear">${yearOptions}</select></label>
-      <label>New grade<input id="newGrade" placeholder="Grade 3"></label>
-      <div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div>
-    </div>
-    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
-    <div class="admin-form-grid">
-      <label>Year<select id="unitYear">${yearOptions}</select></label>
-      <label>Grade<select id="unitGrade"></select></label>
-      <label>Unit name<input id="newUnitName" placeholder="Unit 3"></label>
-      <label>Unit title<input id="newUnitTitle" placeholder="At School"></label>
-      <div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div>
-    </div>`;
+  const {yearOptions}=buildHierarchyOptions();
+  panel.innerHTML=`
+    <h2>Content Structure</h2><p class="admin-note">Add, rename or archive years and grades. Add, rename or hide units. Archived items are kept in the database instead of being permanently deleted.</p>
+    <div class="admin-form-grid"><label>New year<input id="newYear" placeholder="2027"></label><div style="display:flex;align-items:end"><button id="addYear" class="btn btn-accent">+ Year</button></div></div>
+    <hr class="soft">
+    <div class="admin-form-grid"><label>Year<select id="structureYear">${yearOptions}</select></label><label>New grade<input id="newGrade" placeholder="Grade 3"></label><div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div></div>
+    <hr class="soft">
+    <div class="admin-form-grid"><label>Year<select id="unitYear">${yearOptions}</select></label><label>Grade<select id="unitGrade"></select></label><label>Unit name<input id="newUnitName" placeholder="Unit 3"></label><label>Unit title<input id="newUnitTitle" placeholder="At School"></label><div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div></div>
+    <hr class="soft"><h3>Current structure</h3><div id="structureTree" class="structure-tree"></div>`;
+  const unitYear=panel.querySelector('#unitYear'), unitGrade=panel.querySelector('#unitGrade');
+  const fillUnitGrades=()=>{unitGrade.innerHTML=state.grades.filter(g=>g.school_year_id===unitYear.value).map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');};
+  unitYear.addEventListener('change',fillUnitGrades); fillUnitGrades();
+  panel.querySelector('#addYear').addEventListener('click',async()=>{ const name=panel.querySelector('#newYear').value.trim(); if(!name)return; const {error}=await state.client.from('school_years').insert({name,sort_order:Number(name)||9999,archived:false}); if(error)toast(error.message);else await adminStructureRefresh('Year added.'); });
+  panel.querySelector('#addGrade').addEventListener('click',async()=>{ const name=panel.querySelector('#newGrade').value.trim(),school_year_id=panel.querySelector('#structureYear').value; if(!name||!school_year_id)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {error}=await state.client.from('grades').insert({school_year_id,name,sort_order:order,archived:false}); if(error)toast(error.message);else await adminStructureRefresh('Grade added.'); });
+  panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {error}=await state.client.from('units').insert({grade_id,name,title,sort_order:order,is_published:true}); if(error)toast(error.message);else await adminStructureRefresh('Unit added.'); });
+  renderStructureTree(panel.querySelector('#structureTree'));
+}
 
-  const unitYear = panel.querySelector('#unitYear');
-  const unitGrade = panel.querySelector('#unitGrade');
-  const fillUnitGrades = () => {
-    unitGrade.innerHTML = state.grades.filter(g => g.school_year_id === unitYear.value).map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
-  };
-  unitYear.addEventListener('change', fillUnitGrades); fillUnitGrades();
-
-  panel.querySelector('#addYear').addEventListener('click', async () => {
-    const name = panel.querySelector('#newYear').value.trim();
-    if (!name) return;
-    const { error } = await state.client.from('school_years').insert({ name, sort_order:Number(name) || 9999 });
-    if (error) toast(error.message); else await adminStructureRefresh('Year added.');
-  });
-  panel.querySelector('#addGrade').addEventListener('click', async () => {
-    const name = panel.querySelector('#newGrade').value.trim();
-    const school_year_id = panel.querySelector('#structureYear').value;
-    if (!name || !school_year_id) return;
-    const order = Number((name.match(/\d+/) || ['99'])[0]);
-    const { error } = await state.client.from('grades').insert({ school_year_id, name, sort_order:order });
-    if (error) toast(error.message); else await adminStructureRefresh('Grade added.');
-  });
-  panel.querySelector('#addUnit').addEventListener('click', async () => {
-    const grade_id = unitGrade.value;
-    const name = panel.querySelector('#newUnitName').value.trim();
-    const title = panel.querySelector('#newUnitTitle').value.trim();
-    if (!grade_id || !name) return;
-    const order = Number((name.match(/\d+/) || ['99'])[0]);
-    const { error } = await state.client.from('units').insert({ grade_id, name, title, sort_order:order, is_published:true });
-    if (error) toast(error.message); else await adminStructureRefresh('Unit added.');
+function renderStructureTree(tree) {
+  tree.innerHTML='';
+  state.years.forEach(year=>{
+    const y=document.createElement('div'); y.className='structure-year';
+    y.innerHTML=`<div class="structure-row"><strong>📚 ${escapeHtml(year.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-year>Rename</button><button class="btn btn-small btn-danger" data-archive-year>Archive</button></div></div><div data-grades></div>`;
+    y.querySelector('[data-rename-year]').addEventListener('click',()=>renameItem('school_years',year,'Year'));
+    y.querySelector('[data-archive-year]').addEventListener('click',()=>archiveItem('school_years',year,'Year'));
+    const gradesWrap=y.querySelector('[data-grades]');
+    state.grades.filter(g=>g.school_year_id===year.id).forEach(grade=>{
+      const g=document.createElement('div'); g.className='structure-grade';
+      g.innerHTML=`<div class="structure-row"><strong>🎒 ${escapeHtml(grade.name)}</strong><div class="structure-actions"><button class="btn btn-small btn-ghost" data-rename-grade>Rename</button><button class="btn btn-small btn-danger" data-archive-grade>Archive</button></div></div><div data-units></div>`;
+      g.querySelector('[data-rename-grade]').addEventListener('click',()=>renameItem('grades',grade,'Grade'));
+      g.querySelector('[data-archive-grade]').addEventListener('click',()=>archiveItem('grades',grade,'Grade'));
+      const unitsWrap=g.querySelector('[data-units]');
+      state.units.filter(u=>u.grade_id===grade.id).forEach(unit=>{
+        const u=document.createElement('div'); u.className='structure-unit';
+        u.innerHTML=`<span>⭐ <strong>${escapeHtml(unit.name)}</strong>${unit.title?` — ${escapeHtml(unit.title)}`:''}</span><div class="structure-actions"><button class="btn btn-small btn-ghost" data-edit-unit>Edit</button><button class="btn btn-small btn-danger" data-hide-unit>Hide</button></div>`;
+        u.querySelector('[data-edit-unit]').addEventListener('click',()=>editUnit(unit));
+        u.querySelector('[data-hide-unit]').addEventListener('click',()=>hideUnit(unit));
+        unitsWrap.appendChild(u);
+      });
+      gradesWrap.appendChild(g);
+    }); tree.appendChild(y);
   });
 }
 
-async function adminStructureRefresh(message) {
-  await loadStructure();
-  await loadOwnAccess();
-  toast(message);
-  render();
+async function renameItem(table,item,label) {
+  const name=prompt(`${label} name`,item.name); if(name===null||!name.trim())return;
+  const order=label==='Year'?(Number(name)||item.sort_order):Number((name.match(/\d+/)||[item.sort_order||99])[0]);
+  const {error}=await state.client.from(table).update({name:name.trim(),sort_order:order}).eq('id',item.id); if(error)toast(error.message);else await adminStructureRefresh(`${label} renamed.`);
+}
+async function archiveItem(table,item,label) {
+  if(!confirm(`Archive ${item.name}? It will disappear from the normal portal but data will be kept.`))return;
+  const {error}=await state.client.from(table).update({archived:true}).eq('id',item.id); if(error)toast(error.message);else await adminStructureRefresh(`${label} archived.`);
+}
+async function editUnit(unit) {
+  const name=prompt('Unit name',unit.name); if(name===null||!name.trim())return;
+  const title=prompt('Unit title (optional)',unit.title||''); if(title===null)return;
+  const order=Number((name.match(/\d+/)||[unit.sort_order||99])[0]);
+  const {error}=await state.client.from('units').update({name:name.trim(),title:title.trim()||null,sort_order:order}).eq('id',unit.id); if(error)toast(error.message);else await adminStructureRefresh('Unit updated.');
+}
+async function hideUnit(unit) {
+  if(!confirm(`Hide ${unit.name}?`))return;
+  const {error}=await state.client.from('units').update({is_published:false}).eq('id',unit.id); if(error)toast(error.message);else await adminStructureRefresh('Unit hidden.');
+}
+async function adminStructureRefresh(message) { await loadStructure(); await loadOwnAccess(); toast(message); render(); }
+
+function renderAdminSettings(panel) {
+  panel.innerHTML=`<h2>Settings</h2><div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin can create users.<br>ON: visitors can request an account, but every new account remains Pending until you approve it.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.registrationEnabled?'checked':''}><span class="slider"></span></label></div></div><p class="admin-note" style="margin-top:.7em">Recommended: keep registration OFF until you are ready to accept new users. New approved users receive no unit access automatically.</p>`;
+  panel.querySelector('#registrationToggle').addEventListener('change',async(e)=>{
+    const value=e.target.checked;
+    const {error}=await state.client.from('portal_settings').update({registration_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
+    if(error){e.target.checked=!value;return toast(error.message);} state.registrationEnabled=value; toast(`Public registration ${value?'enabled':'disabled'}.`);
+  });
 }
 
 boot();

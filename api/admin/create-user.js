@@ -4,6 +4,10 @@ function cleanUsername(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
 }
 
+function validEmail(value) {
+  return !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -32,8 +36,11 @@ export default async function handler(req, res) {
   const username = cleanUsername(req.body?.username);
   const password = String(req.body?.password || '');
   const displayName = String(req.body?.displayName || username).trim();
+  const contactEmail = String(req.body?.contactEmail || '').trim().toLowerCase() || null;
+
   if (username.length < 3) return res.status(400).json({ error: 'Username must contain at least 3 valid characters.' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
+  if (!validEmail(contactEmail)) return res.status(400).json({ error: 'Contact email is not valid.' });
 
   const email = `${username}@portal.local`;
   const { data, error } = await admin.auth.admin.createUser({
@@ -44,14 +51,19 @@ export default async function handler(req, res) {
   });
   if (error) return res.status(400).json({ error: error.message });
 
-  // Trigger normally creates this row; upsert makes the endpoint resilient if the trigger is delayed.
-  await admin.from('profiles').upsert({
+  const { error: profileError } = await admin.from('profiles').upsert({
     id: data.user.id,
     username,
     display_name: displayName,
+    contact_email: contactEmail,
     role: 'user',
     status: 'active'
   }, { onConflict: 'id' });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    return res.status(400).json({ error: profileError.message });
+  }
 
   return res.status(200).json({ id: data.user.id, username, displayName });
 }

@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0d6f4f" />
-  <title>Pawn to Professor Learning Portal</title>
+  <title>Pawn to Professor Learning Hub</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <main class="scene" aria-label="Pawn to Professor learning portal">
+  <main class="scene" aria-label="Pawn to Professor Learning Hub">
     <section id="boardApp" class="board-shell" aria-live="polite">
       <div id="loadingView" class="center-card">
         <div class="spinner" aria-hidden="true"></div>
@@ -19,8 +19,8 @@
       <section id="loginView" class="view hidden">
         <div class="brand">
           <div class="brand-kicker">PAWN TO PROFESSOR</div>
-          <h1>Learning Portal</h1>
-          <p>Choose your class. Open your unit. Start learning.</p>
+          <h1>Learning Hub</h1>
+          <p>Choose your grade. Open your unit. Start learning.</p>
         </div>
 
         <form id="loginForm" class="login-card">
@@ -33,7 +33,33 @@
             <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
           </label>
           <button class="btn btn-primary" type="submit">Enter Classroom</button>
+          <button id="openRegisterBtn" class="btn btn-ghost register-cta hidden" type="button">Create Account</button>
           <p id="loginMessage" class="form-message" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="registerView" class="view hidden">
+        <div class="brand compact-brand">
+          <div class="brand-kicker">PAWN TO PROFESSOR</div>
+          <h1>Request Access</h1>
+          <p>Your account will stay pending until an administrator approves it.</p>
+        </div>
+
+        <form id="registerForm" class="login-card register-card">
+          <div class="two-col">
+            <label>Username<input id="registerUsername" placeholder="teacher01" required /></label>
+            <label>Full name<input id="registerName" placeholder="Teacher Name" required /></label>
+          </div>
+          <label>Real email<input id="registerEmail" type="email" placeholder="teacher@example.com" required /></label>
+          <div class="two-col">
+            <label>Password<input id="registerPassword" type="password" minlength="8" placeholder="Minimum 8 characters" required /></label>
+            <label>Confirm<input id="registerPassword2" type="password" minlength="8" placeholder="Repeat password" required /></label>
+          </div>
+          <div class="button-row">
+            <button id="backToLoginBtn" class="btn btn-ghost" type="button">← Back</button>
+            <button class="btn btn-primary" type="submit">Request Account</button>
+          </div>
+          <p id="registerMessage" class="form-message" role="alert"></p>
         </form>
       </section>
 
@@ -41,7 +67,7 @@
         <header class="board-header">
           <div>
             <div class="brand-kicker">PAWN TO PROFESSOR</div>
-            <h1 id="pageTitle">Learning Portal</h1>
+            <h1 id="pageTitle">Learning Hub</h1>
           </div>
           <div class="header-actions">
             <button id="backBtn" class="btn btn-ghost hidden" type="button">← Back</button>
