@@ -1,0 +1,15 @@
+{
+  "name": "pawn-to-professor-learning-portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^48.0.0"
+  }
+}

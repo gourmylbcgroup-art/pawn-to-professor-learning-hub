@@ -1,0 +1,578 @@
+/* global supabase */
+
+const els = {
+  loading: document.getElementById('loadingView'),
+  loginView: document.getElementById('loginView'),
+  portalView: document.getElementById('portalView'),
+  loginForm: document.getElementById('loginForm'),
+  loginUsername: document.getElementById('loginUsername'),
+  loginPassword: document.getElementById('loginPassword'),
+  loginMessage: document.getElementById('loginMessage'),
+  pageTitle: document.getElementById('pageTitle'),
+  breadcrumb: document.getElementById('breadcrumb'),
+  content: document.getElementById('contentArea'),
+  backBtn: document.getElementById('backBtn'),
+  adminBtn: document.getElementById('adminBtn'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  tileTemplate: document.getElementById('tileTemplate')
+};
+
+const state = {
+  client: null,
+  session: null,
+  profile: null,
+  years: [],
+  grades: [],
+  units: [],
+  ownAccess: new Set(),
+  view: 'years',
+  year: null,
+  grade: null,
+  unit: null,
+  adminTab: 'users',
+  adminUsers: [],
+  selectedAdminUser: null
+};
+
+const aliasDomain = 'portal.local';
+
+function loginIdentifierToEmail(value) {
+  const clean = value.trim().toLowerCase();
+  if (clean.includes('@')) return clean;
+  return `${clean.replace(/[^a-z0-9._-]/g, '')}@${aliasDomain}`;
+}
+
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+function toast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  document.getElementById('boardApp').appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+async function boot() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error('Missing Vercel/Supabase configuration.');
+    const cfg = await res.json();
+    state.client = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+
+    const { data } = await state.client.auth.getSession();
+    state.session = data.session;
+
+    state.client.auth.onAuthStateChange((_event, session) => {
+      state.session = session;
+    });
+
+    if (state.session) await enterPortal();
+    else showLogin();
+  } catch (err) {
+    hide(els.loading);
+    show(els.loginView);
+    els.loginMessage.textContent = err.message;
+  }
+}
+
+function showLogin() {
+  hide(els.loading);
+  hide(els.portalView);
+  show(els.loginView);
+  els.loginUsername.focus();
+}
+
+els.loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  els.loginMessage.textContent = 'Signing in…';
+  const email = loginIdentifierToEmail(els.loginUsername.value);
+  const password = els.loginPassword.value;
+  const { data, error } = await state.client.auth.signInWithPassword({ email, password });
+  if (error) {
+    els.loginMessage.textContent = 'Username or password is not correct.';
+    return;
+  }
+  state.session = data.session;
+  els.loginMessage.textContent = '';
+  await enterPortal();
+});
+
+els.logoutBtn.addEventListener('click', async () => {
+  await state.client.auth.signOut();
+  Object.assign(state, { session:null, profile:null, view:'years', year:null, grade:null, unit:null });
+  showLogin();
+});
+
+els.backBtn.addEventListener('click', () => {
+  if (state.view === 'admin') { state.view = 'years'; render(); return; }
+  if (state.view === 'activities') { state.view = 'units'; state.unit = null; }
+  else if (state.view === 'units') { state.view = 'grades'; state.grade = null; }
+  else if (state.view === 'grades') { state.view = 'years'; state.year = null; }
+  render();
+});
+
+els.adminBtn.addEventListener('click', async () => {
+  state.view = 'admin';
+  state.adminTab = 'users';
+  await loadAdminUsers();
+  render();
+});
+
+async function enterPortal() {
+  hide(els.loading);
+  hide(els.loginView);
+
+  const uid = state.session.user.id;
+  const { data: profile, error } = await state.client
+    .from('profiles')
+    .select('*')
+    .eq('id', uid)
+    .single();
+
+  if (error || !profile) {
+    await state.client.auth.signOut();
+    els.loginMessage.textContent = 'Your profile is not ready. Ask the administrator.';
+    showLogin();
+    return;
+  }
+  const expired = profile.expires_at && new Date(profile.expires_at) <= new Date();
+  if (profile.status !== 'active' || expired) {
+    await state.client.auth.signOut();
+    els.loginMessage.textContent = expired ? 'This account has expired.' : 'This account is inactive.';
+    showLogin();
+    return;
+  }
+
+  state.profile = profile;
+  await Promise.all([loadStructure(), loadOwnAccess()]);
+  state.view = 'years';
+  show(els.portalView);
+  render();
+}
+
+async function loadStructure() {
+  const [years, grades, units] = await Promise.all([
+    state.client.from('school_years').select('*').order('sort_order'),
+    state.client.from('grades').select('*').order('sort_order'),
+    state.client.from('units').select('*').eq('is_published', true).order('sort_order')
+  ]);
+  if (years.error || grades.error || units.error) throw years.error || grades.error || units.error;
+  state.years = years.data || [];
+  state.grades = grades.data || [];
+  state.units = units.data || [];
+}
+
+async function loadOwnAccess() {
+  if (state.profile?.role === 'admin') {
+    state.ownAccess = new Set(state.units.map(u => u.id));
+    return;
+  }
+  const { data, error } = await state.client
+    .from('user_unit_access')
+    .select('unit_id, expires_at')
+    .eq('user_id', state.session.user.id);
+  if (error) throw error;
+  const now = Date.now();
+  state.ownAccess = new Set((data || [])
+    .filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now)
+    .map(r => r.unit_id));
+}
+
+function setHeader(title, crumbs = []) {
+  els.pageTitle.textContent = title;
+  els.breadcrumb.textContent = crumbs.join('  ›  ');
+  state.profile?.role === 'admin' ? show(els.adminBtn) : hide(els.adminBtn);
+  state.view === 'years' ? hide(els.backBtn) : show(els.backBtn);
+}
+
+function makeTile({ icon, title, subtitle, locked = false, onClick }) {
+  const node = els.tileTemplate.content.firstElementChild.cloneNode(true);
+  node.querySelector('.tile-icon').textContent = icon;
+  node.querySelector('.tile-title').textContent = title;
+  node.querySelector('.tile-subtitle').textContent = subtitle || '';
+  if (locked) {
+    node.classList.add('locked');
+    node.querySelector('.lock-badge').classList.remove('hidden');
+  }
+  node.addEventListener('click', onClick);
+  return node;
+}
+
+function render() {
+  els.content.innerHTML = '';
+  if (state.view === 'years') renderYears();
+  else if (state.view === 'grades') renderGrades();
+  else if (state.view === 'units') renderUnits();
+  else if (state.view === 'activities') renderActivities();
+  else if (state.view === 'admin') renderAdmin();
+}
+
+function renderYears() {
+  setHeader(`Welcome, ${state.profile.display_name || state.profile.username || 'Teacher'}`, []);
+  const grid = document.createElement('div');
+  grid.className = 'tile-grid';
+  for (const year of state.years) {
+    const grades = state.grades.filter(g => g.school_year_id === year.id);
+    grid.appendChild(makeTile({
+      icon: '📚', title: year.name, subtitle: `${grades.length} grades`,
+      onClick: () => { state.year = year; state.view = 'grades'; render(); }
+    }));
+  }
+  if (!state.years.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No school years yet.</strong><br>Ask the administrator to add one.</div></div>';
+  else els.content.appendChild(grid);
+}
+
+function renderGrades() {
+  setHeader('Choose a Grade', [state.year.name]);
+  const grid = document.createElement('div');
+  grid.className = 'tile-grid';
+  const grades = state.grades.filter(g => g.school_year_id === state.year.id);
+  for (const grade of grades) {
+    const units = state.units.filter(u => u.grade_id === grade.id);
+    const unlockedCount = units.filter(u => state.ownAccess.has(u.id)).length;
+    grid.appendChild(makeTile({
+      icon: '🎒', title: grade.name,
+      subtitle: state.profile.role === 'admin' ? `${units.length} units` : `${unlockedCount}/${units.length} units open`,
+      onClick: () => { state.grade = grade; state.view = 'units'; render(); }
+    }));
+  }
+  els.content.appendChild(grid);
+}
+
+function renderUnits() {
+  setHeader('Choose a Unit', [state.year.name, state.grade.name]);
+  const grid = document.createElement('div');
+  grid.className = 'tile-grid';
+  const units = state.units.filter(u => u.grade_id === state.grade.id);
+  for (const unit of units) {
+    const locked = !state.ownAccess.has(unit.id);
+    grid.appendChild(makeTile({
+      icon: locked ? '🔒' : '⭐',
+      title: unit.name,
+      subtitle: locked ? 'No access' : (unit.title || 'Open unit'),
+      locked,
+      onClick: () => {
+        if (locked) { toast('This unit is locked for this account.'); return; }
+        state.unit = unit; state.view = 'activities'; render();
+      }
+    }));
+  }
+  if (!units.length) els.content.innerHTML = '<div class="empty-state"><div><strong>No units yet.</strong><br>The administrator can add units from Admin.</div></div>';
+  else els.content.appendChild(grid);
+}
+
+async function renderActivities() {
+  setHeader(state.unit.name, [state.year.name, state.grade.name, state.unit.name]);
+  els.content.innerHTML = '<div class="empty-state">Loading activities…</div>';
+  const { data, error } = await state.client
+    .from('activities')
+    .select('*')
+    .eq('unit_id', state.unit.id)
+    .eq('published', true)
+    .order('sort_order');
+  if (state.view !== 'activities') return;
+  els.content.innerHTML = '';
+  if (error) { els.content.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; return; }
+  if (!data?.length) {
+    els.content.innerHTML = '<div class="empty-state"><div><strong>This unit is ready.</strong><br>No games have been added yet.</div></div>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className = 'activity-list';
+  data.forEach(a => {
+    const card = document.createElement('article');
+    card.className = 'activity-card';
+    card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')}</p>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = 'Play ▶';
+    btn.addEventListener('click', () => window.open(a.launch_url, '_blank', 'noopener,noreferrer'));
+    card.appendChild(btn);
+    list.appendChild(card);
+  });
+  els.content.appendChild(list);
+}
+
+async function loadAdminUsers() {
+  if (state.profile?.role !== 'admin') return;
+  const { data, error } = await state.client.from('profiles').select('*').order('username');
+  if (!error) state.adminUsers = data || [];
+}
+
+function renderAdmin() {
+  setHeader('Administrator', ['Admin']);
+  const wrap = document.createElement('div');
+  wrap.className = 'admin-wrap';
+  wrap.innerHTML = `
+    <aside class="admin-sidebar">
+      <div class="admin-tabs">
+        <button class="btn btn-ghost ${state.adminTab === 'users' ? 'active' : ''}" data-tab="users">👤 Users & Access</button>
+        <button class="btn btn-ghost ${state.adminTab === 'content' ? 'active' : ''}" data-tab="content">🎮 Activities</button>
+        <button class="btn btn-ghost ${state.adminTab === 'structure' ? 'active' : ''}" data-tab="structure">📚 Years / Grades / Units</button>
+      </div>
+    </aside>
+    <section class="admin-panel" id="adminPanel"></section>`;
+  els.content.appendChild(wrap);
+  wrap.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', async () => {
+    state.adminTab = btn.dataset.tab;
+    if (state.adminTab === 'users') await loadAdminUsers();
+    render();
+  }));
+  if (state.adminTab === 'users') renderAdminUsers(wrap.querySelector('#adminPanel'));
+  if (state.adminTab === 'content') renderAdminContent(wrap.querySelector('#adminPanel'));
+  if (state.adminTab === 'structure') renderAdminStructure(wrap.querySelector('#adminPanel'));
+}
+
+function renderAdminUsers(panel) {
+  panel.innerHTML = `
+    <h2>Users & Unit Access</h2>
+    <div class="admin-form-grid">
+      <label>Username<input id="newUsername" placeholder="teacher01"></label>
+      <label>Display name<input id="newDisplayName" placeholder="Teacher Name"></label>
+      <label>Password<input id="newPassword" type="password" placeholder="Minimum 8 characters"></label>
+      <div style="display:flex;align-items:end"><button id="createUserBtn" class="btn btn-accent" type="button">+ Create User</button></div>
+    </div>
+    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
+    <div class="admin-form-grid" style="grid-template-columns:.75fr 1.25fr">
+      <div><h3>Accounts</h3><div class="user-list" id="userList"></div></div>
+      <div id="permissionEditor"><p class="admin-note">Select a user to control exactly which units they can open.</p></div>
+    </div>`;
+
+  panel.querySelector('#createUserBtn').addEventListener('click', createUserFromAdmin);
+  const userList = panel.querySelector('#userList');
+  state.adminUsers.forEach(user => {
+    const row = document.createElement('button');
+    row.className = `user-row ${state.selectedAdminUser?.id === user.id ? 'active' : ''}`;
+    row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><small>${escapeHtml(user.role)}</small>`;
+    row.addEventListener('click', async () => {
+      state.selectedAdminUser = user;
+      renderAdminUserPermissions(panel.querySelector('#permissionEditor'), user);
+      userList.querySelectorAll('.user-row').forEach(x => x.classList.remove('active'));
+      row.classList.add('active');
+    });
+    userList.appendChild(row);
+  });
+  if (state.selectedAdminUser) renderAdminUserPermissions(panel.querySelector('#permissionEditor'), state.selectedAdminUser);
+}
+
+async function createUserFromAdmin() {
+  const username = document.getElementById('newUsername').value.trim();
+  const displayName = document.getElementById('newDisplayName').value.trim();
+  const password = document.getElementById('newPassword').value;
+  if (!username || password.length < 8) { toast('Add a username and a password of at least 8 characters.'); return; }
+
+  const { data: { session } } = await state.client.auth.getSession();
+  const res = await fetch('/api/admin/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    body: JSON.stringify({ username, displayName, password })
+  });
+  const body = await res.json();
+  if (!res.ok) { toast(body.error || 'Could not create user.'); return; }
+  toast(`User ${username} created.`);
+  state.selectedAdminUser = null;
+  await loadAdminUsers();
+  render();
+}
+
+async function renderAdminUserPermissions(container, user) {
+  container.innerHTML = '<p class="admin-note">Loading access…</p>';
+  const { data: access, error } = await state.client.from('user_unit_access').select('*').eq('user_id', user.id);
+  if (error) { container.textContent = error.message; return; }
+  const checked = new Set((access || []).map(a => a.unit_id));
+  container.innerHTML = `
+    <h3>${escapeHtml(user.username || '')}</h3>
+    <div class="admin-form-grid">
+      <label>Status<select id="userStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+      <label>Expiry date<input id="userExpiry" type="date"></label>
+    </div>
+    <div style="display:flex;gap:.45em;margin:.6em 0">
+      <button id="allAccess" class="btn btn-small btn-ghost">All Units</button>
+      <button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button>
+      <button id="clearAccess" class="btn btn-small btn-ghost">Clear</button>
+    </div>
+    <div id="permissionMatrix"></div>
+    <button id="savePermissions" class="btn btn-accent" type="button">Save Access</button>`;
+  container.querySelector('#userStatus').value = user.status || 'active';
+  if (user.expires_at) container.querySelector('#userExpiry').value = new Date(user.expires_at).toISOString().slice(0,10);
+
+  const matrix = container.querySelector('#permissionMatrix');
+  state.years.forEach(year => {
+    const y = document.createElement('div');
+    y.className = 'permission-group';
+    y.innerHTML = `<strong>${escapeHtml(year.name)}</strong>`;
+    state.grades.filter(g => g.school_year_id === year.id).forEach(grade => {
+      const units = state.units.filter(u => u.grade_id === grade.id);
+      const row = document.createElement('div');
+      row.innerHTML = `<div class="permission-grade"><span>${escapeHtml(grade.name)}</span><button class="btn btn-small btn-ghost" data-grade-all="${grade.id}">All</button></div>`;
+      const unitWrap = document.createElement('div');
+      unitWrap.className = 'permission-units';
+      units.forEach(unit => {
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" data-unit-id="${unit.id}" ${checked.has(unit.id) ? 'checked' : ''}> ${escapeHtml(unit.name)}`;
+        unitWrap.appendChild(label);
+      });
+      row.appendChild(unitWrap);
+      y.appendChild(row);
+    });
+    matrix.appendChild(y);
+  });
+
+  container.querySelectorAll('[data-grade-all]').forEach(btn => btn.addEventListener('click', () => {
+    const gradeId = btn.dataset.gradeAll;
+    const ids = state.units.filter(u => u.grade_id === gradeId).map(u => u.id);
+    container.querySelectorAll('[data-unit-id]').forEach(cb => { if (ids.includes(cb.dataset.unitId)) cb.checked = true; });
+  }));
+  container.querySelector('#allAccess').addEventListener('click', () => container.querySelectorAll('[data-unit-id]').forEach(cb => cb.checked = true));
+  container.querySelector('#clearAccess').addEventListener('click', () => container.querySelectorAll('[data-unit-id]').forEach(cb => cb.checked = false));
+  container.querySelector('#unit1All').addEventListener('click', () => {
+    container.querySelectorAll('[data-unit-id]').forEach(cb => {
+      const unit = state.units.find(u => u.id === cb.dataset.unitId);
+      if (unit?.name.trim().toLowerCase() === 'unit 1') cb.checked = true;
+    });
+  });
+  container.querySelector('#savePermissions').addEventListener('click', () => savePermissions(container, user));
+}
+
+async function savePermissions(container, user) {
+  const selected = [...container.querySelectorAll('[data-unit-id]:checked')].map(cb => cb.dataset.unitId);
+  const status = container.querySelector('#userStatus').value;
+  const expiryRaw = container.querySelector('#userExpiry').value;
+  const expiresAt = expiryRaw ? new Date(`${expiryRaw}T23:59:59`).toISOString() : null;
+
+  const { error: profileError } = await state.client.from('profiles').update({ status, expires_at: expiresAt }).eq('id', user.id);
+  if (profileError) { toast(profileError.message); return; }
+
+  const { error: deleteError } = await state.client.from('user_unit_access').delete().eq('user_id', user.id);
+  if (deleteError) { toast(deleteError.message); return; }
+
+  if (selected.length) {
+    const rows = selected.map(unitId => ({ user_id:user.id, unit_id:unitId, granted_by:state.session.user.id }));
+    const { error: insertError } = await state.client.from('user_unit_access').insert(rows);
+    if (insertError) { toast(insertError.message); return; }
+  }
+  user.status = status;
+  user.expires_at = expiresAt;
+  toast(`Access saved for ${user.username}.`);
+}
+
+function buildHierarchyOptions(selected = {}) {
+  const yearOptions = state.years.map(y => `<option value="${y.id}" ${selected.year === y.id ? 'selected' : ''}>${escapeHtml(y.name)}</option>`).join('');
+  return { yearOptions };
+}
+
+function renderAdminContent(panel) {
+  const { yearOptions } = buildHierarchyOptions();
+  panel.innerHTML = `
+    <h2>Add Game / Activity</h2>
+    <div class="admin-form-grid">
+      <label>Year<select id="activityYear">${yearOptions}</select></label>
+      <label>Grade<select id="activityGrade"></select></label>
+      <label>Unit<select id="activityUnit"></select></label>
+      <label>Type<select id="activityType"><option>Game</option><option>Interactive Lesson</option><option>Worksheet</option><option>Quiz</option></select></label>
+      <label class="wide">Title<input id="activityTitle" placeholder="Numbers Challenge"></label>
+      <label class="wide">Launch URL<input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
+      <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Activity</button></div>
+    </div>
+    <p class="admin-note">Tip: your existing game repositories can stay separate. Add each deployed game URL here and assign it to the correct year, grade and unit.</p>`;
+
+  const yearSel = panel.querySelector('#activityYear');
+  const gradeSel = panel.querySelector('#activityGrade');
+  const unitSel = panel.querySelector('#activityUnit');
+  const refreshGrades = () => {
+    const gs = state.grades.filter(g => g.school_year_id === yearSel.value);
+    gradeSel.innerHTML = gs.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+    refreshUnits();
+  };
+  const refreshUnits = () => {
+    const us = state.units.filter(u => u.grade_id === gradeSel.value);
+    unitSel.innerHTML = us.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+  };
+  yearSel.addEventListener('change', refreshGrades);
+  gradeSel.addEventListener('change', refreshUnits);
+  refreshGrades();
+
+  panel.querySelector('#addActivity').addEventListener('click', async () => {
+    const row = {
+      unit_id: unitSel.value,
+      title: panel.querySelector('#activityTitle').value.trim(),
+      type: panel.querySelector('#activityType').value,
+      launch_url: panel.querySelector('#activityUrl').value.trim(),
+      published: true,
+      sort_order: 10
+    };
+    if (!row.unit_id || !row.title || !row.launch_url) { toast('Choose a unit and add a title and URL.'); return; }
+    const { error } = await state.client.from('activities').insert(row);
+    if (error) toast(error.message); else { toast('Activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; }
+  });
+}
+
+function renderAdminStructure(panel) {
+  const { yearOptions } = buildHierarchyOptions();
+  panel.innerHTML = `
+    <h2>School Structure</h2>
+    <div class="admin-form-grid">
+      <label>New year<input id="newYear" placeholder="2027"></label>
+      <div style="display:flex;align-items:end"><button id="addYear" class="btn btn-accent">+ Year</button></div>
+    </div>
+    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
+    <div class="admin-form-grid">
+      <label>Year<select id="structureYear">${yearOptions}</select></label>
+      <label>New grade<input id="newGrade" placeholder="Grade 3"></label>
+      <div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div>
+    </div>
+    <hr style="border:0;border-top:1px solid rgba(255,255,255,.18);margin:.8em 0">
+    <div class="admin-form-grid">
+      <label>Year<select id="unitYear">${yearOptions}</select></label>
+      <label>Grade<select id="unitGrade"></select></label>
+      <label>Unit name<input id="newUnitName" placeholder="Unit 3"></label>
+      <label>Unit title<input id="newUnitTitle" placeholder="At School"></label>
+      <div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div>
+    </div>`;
+
+  const unitYear = panel.querySelector('#unitYear');
+  const unitGrade = panel.querySelector('#unitGrade');
+  const fillUnitGrades = () => {
+    unitGrade.innerHTML = state.grades.filter(g => g.school_year_id === unitYear.value).map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+  };
+  unitYear.addEventListener('change', fillUnitGrades); fillUnitGrades();
+
+  panel.querySelector('#addYear').addEventListener('click', async () => {
+    const name = panel.querySelector('#newYear').value.trim();
+    if (!name) return;
+    const { error } = await state.client.from('school_years').insert({ name, sort_order:Number(name) || 9999 });
+    if (error) toast(error.message); else await adminStructureRefresh('Year added.');
+  });
+  panel.querySelector('#addGrade').addEventListener('click', async () => {
+    const name = panel.querySelector('#newGrade').value.trim();
+    const school_year_id = panel.querySelector('#structureYear').value;
+    if (!name || !school_year_id) return;
+    const order = Number((name.match(/\d+/) || ['99'])[0]);
+    const { error } = await state.client.from('grades').insert({ school_year_id, name, sort_order:order });
+    if (error) toast(error.message); else await adminStructureRefresh('Grade added.');
+  });
+  panel.querySelector('#addUnit').addEventListener('click', async () => {
+    const grade_id = unitGrade.value;
+    const name = panel.querySelector('#newUnitName').value.trim();
+    const title = panel.querySelector('#newUnitTitle').value.trim();
+    if (!grade_id || !name) return;
+    const order = Number((name.match(/\d+/) || ['99'])[0]);
+    const { error } = await state.client.from('units').insert({ grade_id, name, title, sort_order:order, is_published:true });
+    if (error) toast(error.message); else await adminStructureRefresh('Unit added.');
+  });
+}
+
+async function adminStructureRefresh(message) {
+  await loadStructure();
+  await loadOwnAccess();
+  toast(message);
+  render();
+}
+
+boot();
