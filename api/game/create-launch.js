@@ -49,15 +49,12 @@ export default async function handler(req, res) {
   }
 
   if (target.security_mode === 'unit' && !['admin', 'owner'].includes(profile?.role)) {
-    const { data: access } = await admin
-      .from('user_unit_access')
-      .select('unit_id,expires_at')
-      .eq('user_id', user.id)
-      .eq('unit_id', activity.unit_id)
-      .maybeSingle();
-
-    const allowed = access && (!access.expires_at || new Date(access.expires_at) > new Date());
-    if (!allowed) return json(res, 403, { error: 'This activity is not included in your account.' });
+    // v1.4: direct Unit grants and Dynamic Access Groups use the same server-side rule.
+    const { data: allowed, error: accessError } = await admin.rpc('user_has_effective_unit_access', {
+      target_user: user.id,
+      target_unit: activity.unit_id
+    });
+    if (accessError || !allowed) return json(res, 403, { error: 'This activity is not included in your account.' });
   }
 
   const rawToken = crypto.randomBytes(32).toString('base64url');

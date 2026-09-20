@@ -33,6 +33,7 @@ const els = {
 
 const DEFAULT_SETTINGS = {
   registration_enabled: false,
+  community_enabled: false,
   portal_title: 'Learning Hub',
   portal_subtitle: 'Choose your grade. Open your unit. Start learning.',
   brand_kicker: 'PAWN TO PROFESSOR',
@@ -64,7 +65,11 @@ const state = {
   adminTab: 'dashboard',
   adminUsers: [],
   selectedAdminUser: null,
-  packages: []
+  packages: [],
+  accessGroups: [],
+  selectedAccessGroup: null,
+  communityCategory: null,
+  communityTopic: null
 };
 
 const aliasDomain = 'portal.local';
@@ -222,14 +227,17 @@ els.logoutBtn.addEventListener('click', async () => {
   await state.client.auth.signOut();
   Object.assign(state, {
     session:null, profile:null, view:'years', year:null, grade:null, unit:null,
-    selectedAdminUser:null, adminUsers:[], packages:[], tools:[]
+    selectedAdminUser:null, adminUsers:[], packages:[], accessGroups:[], selectedAccessGroup:null,
+    communityCategory:null, communityTopic:null, tools:[]
   });
   await loadPublicSettings();
   showLogin();
 });
 
 els.backBtn.addEventListener('click', () => {
-  if (state.view === 'admin' || state.view === 'tools') { state.view = 'years'; render(); return; }
+  if (state.view === 'admin' || state.view === 'tools' || state.view === 'community') { state.view = 'years'; render(); return; }
+  if (state.view === 'communityCategory') { state.view = 'community'; state.communityCategory = null; render(); return; }
+  if (state.view === 'communityTopic') { state.view = 'communityCategory'; state.communityTopic = null; render(); return; }
   if (state.view === 'activities') { state.view = 'units'; state.unit = null; }
   else if (state.view === 'units') { state.view = 'grades'; state.grade = null; }
   else if (state.view === 'grades') { state.view = 'years'; state.year = null; }
@@ -239,7 +247,7 @@ els.backBtn.addEventListener('click', () => {
 els.adminBtn.addEventListener('click', async () => {
   state.view = 'admin';
   state.adminTab = 'dashboard';
-  await Promise.all([loadAdminUsers(), loadPackages()]);
+  await Promise.all([loadAdminUsers(), loadPackages(), loadAccessGroups()]);
   render();
 });
 
@@ -264,7 +272,9 @@ async function enterPortal() {
   }
 
   state.profile = profile;
-  await Promise.all([loadStructure(), loadOwnAccess(), loadExternalTools(), loadPublicSettings()]);
+  // v1.4 reliability fix: structure must be loaded before staff access is calculated.
+  await loadStructure();
+  await Promise.all([loadOwnAccess(), loadExternalTools(), loadPublicSettings()]);
   state.view = 'years';
   show(els.portalView);
   render();
@@ -283,14 +293,15 @@ async function loadStructure() {
 }
 
 async function loadOwnAccess() {
+  // Admin and Owner always receive every currently published Unit.
   if (isStaff()) {
     state.ownAccess = new Set(state.units.map(u => u.id));
     return;
   }
-  const { data, error } = await state.client.from('user_unit_access').select('unit_id, expires_at').eq('user_id', state.session.user.id);
+  // Users receive direct permissions PLUS dynamic Access Group rules.
+  const { data, error } = await state.client.rpc('accessible_unit_ids');
   if (error) throw error;
-  const now = Date.now();
-  state.ownAccess = new Set((data || []).filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now).map(r => r.unit_id));
+  state.ownAccess = new Set((data || []).map(r => r.unit_id));
 }
 
 async function loadExternalTools() {
@@ -327,6 +338,9 @@ function render() {
   else if (state.view === 'units') renderUnits();
   else if (state.view === 'activities') renderActivities();
   else if (state.view === 'tools') renderTools();
+  else if (state.view === 'community') renderCommunity();
+  else if (state.view === 'communityCategory') renderCommunityCategory();
+  else if (state.view === 'communityTopic') renderCommunityTopic();
   else if (state.view === 'admin') renderAdmin();
 }
 
@@ -338,6 +352,12 @@ function renderYears() {
     grid.appendChild(makeTile({
       icon:'📚', title:year.name, subtitle:`${grades.length} grades`,
       onClick:()=>{ state.year=year; state.view='grades'; render(); }
+    }));
+  }
+  if (state.settings.community_enabled) {
+    grid.appendChild(makeTile({
+      icon:'💬', title:'Community', subtitle:'Announcements, help and teaching ideas',
+      onClick:()=>{ state.view='community'; state.communityCategory=null; state.communityTopic=null; render(); }
     }));
   }
   if (state.tools.length) {
@@ -360,7 +380,7 @@ function renderGrades() {
     grid.appendChild(makeTile({
       icon:'🎒', title:grade.name,
       subtitle:isStaff()?`${units.length} units`:`${unlockedCount}/${units.length} units open`,
-      onClick:()=>{ state.grade=grade; state.view='units'; render(); }
+      onClick:async()=>{ state.grade=grade; await loadOwnAccess(); state.view='units'; render(); }
     }));
   }
   els.content.appendChild(grid);
@@ -371,7 +391,7 @@ function renderUnits() {
   const grid = document.createElement('div'); grid.className='tile-grid';
   const units = state.units.filter(u => u.grade_id === state.grade.id);
   for (const unit of units) {
-    const locked = !state.ownAccess.has(unit.id);
+    const locked = !isStaff() && !state.ownAccess.has(unit.id);
     grid.appendChild(makeTile({
       icon:locked?'🔒':'⭐', title:unit.name, subtitle:locked?'No access':(unit.title||'Open unit'), locked,
       onClick:()=>{ if (locked) return toast('This unit is locked for this account.'); state.unit=unit; state.view='activities'; render(); }
@@ -398,7 +418,13 @@ async function renderActivities() {
     card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')} · Secure launch</p>`;
     const btn = document.createElement('button'); btn.className='btn'; btn.textContent='PLAY 🔐';
     btn.addEventListener('click',()=>window.open(`/play.html?activity=${encodeURIComponent(a.id)}`,'_blank','noopener,noreferrer'));
-    card.appendChild(btn); list.appendChild(card);
+    card.appendChild(btn);
+    if (state.settings.community_enabled) {
+      const discuss=document.createElement('button'); discuss.className='btn btn-ghost btn-small'; discuss.textContent='Discuss 💬';
+      discuss.addEventListener('click',()=>{state.view='community';state.communityCategory=null;state.communityTopic=null;render();});
+      card.appendChild(discuss);
+    }
+    list.appendChild(card);
   });
   els.content.appendChild(list);
 }
@@ -432,6 +458,15 @@ async function loadPackages() {
   state.packages = error ? [] : (data || []);
 }
 
+async function loadAccessGroups() {
+  if (!isStaff()) return;
+  const { data, error } = await state.client.from('access_groups').select('*').order('name');
+  state.accessGroups = error ? [] : (data || []);
+  if (state.selectedAccessGroup) {
+    state.selectedAccessGroup = state.accessGroups.find(g => g.id === state.selectedAccessGroup.id) || null;
+  }
+}
+
 async function logAudit(action, entityType = null, entityId = null, details = {}) {
   if (!isStaff()) return;
   try {
@@ -452,10 +487,12 @@ function renderAdmin() {
     ['dashboard','📊 Dashboard'],
     ['requests',`👥 Requests${pendingCount?` (${pendingCount})`:''}`],
     ['users','👤 Users & Access'],
+    ['groups','👥 Access Groups'],
     ['packages','🎟 Access Packages'],
     ['content','🎮 Activities'],
     ['structure','📚 Content Structure'],
     ['tools','🧰 Teacher Tools'],
+    ['communityAdmin','💬 Community'],
     ['design','🎨 Design Studio'],
     ['settings','⚙️ Settings'],
     ['audit','🧾 Audit Log']
@@ -469,17 +506,19 @@ function renderAdmin() {
   els.content.appendChild(wrap);
   wrap.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', async () => {
     state.adminTab = btn.dataset.tab;
-    await Promise.all([loadAdminUsers(), loadPackages()]);
+    await Promise.all([loadAdminUsers(), loadPackages(), loadAccessGroups()]);
     render();
   }));
   const panel = wrap.querySelector('#adminPanel');
   if (state.adminTab === 'dashboard') renderAdminDashboard(panel);
   if (state.adminTab === 'requests') renderAdminRequests(panel);
   if (state.adminTab === 'users') renderAdminUsers(panel);
+  if (state.adminTab === 'groups') renderAdminGroups(panel);
   if (state.adminTab === 'packages') renderAdminPackages(panel);
   if (state.adminTab === 'content') renderAdminContent(panel);
   if (state.adminTab === 'structure') renderAdminStructure(panel);
   if (state.adminTab === 'tools') renderAdminTools(panel);
+  if (state.adminTab === 'communityAdmin') renderAdminCommunity(panel);
   if (state.adminTab === 'design') renderAdminDesign(panel);
   if (state.adminTab === 'settings') renderAdminSettings(panel);
   if (state.adminTab === 'audit') renderAdminAudit(panel);
@@ -509,14 +548,14 @@ async function renderAdminDashboard(panel) {
       <button id="exportBackup" class="btn btn-accent">Download JSON Backup</button>
       <button id="refreshDashboard" class="btn btn-ghost">Refresh</button>
     </div>
-    <p class="admin-note">Teacher tools configured: ${toolCount.count ?? 0}. Registration is ${state.settings.registration_enabled ? 'ON' : 'OFF'}.</p>`;
+    <p class="admin-note">Teacher tools: ${toolCount.count ?? 0}. Dynamic Access Groups: ${state.accessGroups.length}. Registration: ${state.settings.registration_enabled ? 'ON' : 'OFF'}. Community: ${state.settings.community_enabled ? 'ON' : 'OFF'}.</p>`;
   area.querySelector('#exportBackup').addEventListener('click', exportAdminBackup);
   area.querySelector('#refreshDashboard').addEventListener('click', ()=>renderAdminDashboard(panel));
 }
 
 async function exportAdminBackup() {
-  const tables = ['profiles','school_years','grades','units','activities','user_unit_access','access_packages','access_package_units','external_tools','portal_settings'];
-  const backup = { exported_at:new Date().toISOString(), version:'1.2', data:{} };
+  const tables = ['profiles','school_years','grades','units','activities','user_unit_access','access_packages','access_package_units','access_groups','access_group_members','access_group_rules','external_tools','portal_settings','forum_categories','forum_topics','forum_posts'];
+  const backup = { exported_at:new Date().toISOString(), version:'1.4', data:{} };
   for (const table of tables) {
     const { data, error } = await state.client.from(table).select('*');
     backup.data[table] = error ? { error:error.message } : data;
@@ -600,13 +639,18 @@ async function createUserFromAdmin() {
 
 async function renderAdminUserPermissions(container, user) {
   container.innerHTML='<p class="admin-note">Loading access…</p>';
-  const [{ data: access, error }, { data: packageUnits }] = await Promise.all([
+  const [{ data: access, error }, { data: packageUnits }, { data: memberships }] = await Promise.all([
     state.client.from('user_unit_access').select('*').eq('user_id', user.id),
-    state.client.from('access_package_units').select('*')
+    state.client.from('access_package_units').select('*'),
+    state.client.from('access_group_members').select('group_id').eq('user_id', user.id)
   ]);
   if (error) { container.textContent=error.message; return; }
   const checked = new Set((access||[]).map(a=>a.unit_id));
+  const groupIds = new Set((memberships||[]).map(m=>m.group_id));
+  const memberGroups = state.accessGroups.filter(g=>groupIds.has(g.id));
   const roleOptions = ['user','admin','owner'].map(r=>option(r,r[0].toUpperCase()+r.slice(1),user.role)).join('');
+  const isTargetStaff = ['admin','owner'].includes(user.role);
+
   container.innerHTML = `
     <h3>${escapeHtml(user.username || '')} ${roleBadge(user.role)}</h3>
     <p class="admin-note">${escapeHtml(user.contact_email || 'No contact email')}</p>
@@ -618,42 +662,57 @@ async function renderAdminUserPermissions(container, user) {
       <label class="wide">Private admin notes<textarea id="userNotes" rows="2" placeholder="Internal notes only">${escapeHtml(user.admin_notes || '')}</textarea></label>
     </div>
     ${!isOwner()?'<p class="admin-note">Only the Owner can promote or demote administrators.</p>':''}
-    <div class="admin-form-grid" style="margin-top:.55em">
-      <label>Apply access package<select id="packageSelect"><option value="">Choose package…</option>${state.packages.filter(p=>p.active).map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></label>
-      <div style="display:flex;align-items:end"><button id="applyPackage" class="btn btn-small btn-ghost">Apply Package</button></div>
-    </div>
-    <div style="display:flex;gap:.45em;margin:.6em 0;flex-wrap:wrap"><button id="allAccess" class="btn btn-small btn-ghost">All Units</button><button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button><button id="clearAccess" class="btn btn-small btn-ghost">Clear</button></div>
-    <div id="permissionMatrix"></div><button id="savePermissions" class="btn btn-accent" type="button">Save User</button>`;
+    ${isTargetStaff ? `
+      <div class="full-access-card"><strong>✅ FULL PORTAL ACCESS</strong><p>Admin and Owner accounts automatically have access to every current and future Year, Grade, Unit and Game. No Unit checkboxes are required.</p></div>
+      <button id="savePermissions" class="btn btn-accent" type="button">Save Profile</button>
+    ` : `
+      <div class="group-summary"><strong>Dynamic Access Groups</strong><p class="admin-note">${memberGroups.length ? memberGroups.map(g=>escapeHtml(g.name)).join(' · ') : 'No Access Group assigned.'}</p></div>
+      <div class="admin-form-grid" style="margin-top:.55em">
+        <label>Apply access package<select id="packageSelect"><option value="">Choose package…</option>${state.packages.filter(p=>p.active).map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></label>
+        <div style="display:flex;align-items:end"><button id="applyPackage" class="btn btn-small btn-ghost">Apply Package</button></div>
+      </div>
+      <div style="display:flex;gap:.45em;margin:.6em 0;flex-wrap:wrap"><button id="allAccess" class="btn btn-small btn-ghost">All Current Units</button><button id="unit1All" class="btn btn-small btn-ghost">Unit 1 · All Grades</button><button id="clearAccess" class="btn btn-small btn-ghost">Clear Direct Access</button><button id="previewEffective" class="btn btn-small btn-accent">Preview Effective Access</button></div>
+      <div id="permissionMatrix"></div><button id="savePermissions" class="btn btn-accent" type="button">Save User</button>
+    `}`;
   if (user.expires_at) container.querySelector('#userExpiry').value = new Date(user.expires_at).toISOString().slice(0,10);
-  const matrix=container.querySelector('#permissionMatrix');
-  state.years.forEach(year=>{
-    const y=document.createElement('div'); y.className='permission-group'; y.innerHTML=`<strong>${escapeHtml(year.name)}</strong>`;
-    state.grades.filter(g=>g.school_year_id===year.id).forEach(grade=>{
-      const units=state.units.filter(u=>u.grade_id===grade.id); const row=document.createElement('div');
-      row.innerHTML=`<div class="permission-grade"><span>${escapeHtml(grade.name)}</span><button class="btn btn-small btn-ghost" data-grade-all="${grade.id}">All</button></div>`;
-      const unitWrap=document.createElement('div'); unitWrap.className='permission-units';
-      units.forEach(unit=>{ const label=document.createElement('label'); label.innerHTML=`<input type="checkbox" data-unit-id="${unit.id}" ${checked.has(unit.id)?'checked':''}> ${escapeHtml(unit.name)}`; unitWrap.appendChild(label); });
-      row.appendChild(unitWrap); y.appendChild(row);
-    }); matrix.appendChild(y);
-  });
-  container.querySelectorAll('[data-grade-all]').forEach(btn=>btn.addEventListener('click',()=>{
-    const ids=state.units.filter(u=>u.grade_id===btn.dataset.gradeAll).map(u=>u.id);
-    container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
-  }));
-  container.querySelector('#allAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=true));
-  container.querySelector('#clearAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=false));
-  container.querySelector('#unit1All').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>{ const unit=state.units.find(u=>u.id===cb.dataset.unitId); if(unit?.name.trim().toLowerCase()==='unit 1') cb.checked=true; }));
-  container.querySelector('#applyPackage').addEventListener('click',()=>{
-    const id=container.querySelector('#packageSelect').value; if(!id)return toast('Choose a package first.');
-    const ids=(packageUnits||[]).filter(x=>x.package_id===id).map(x=>x.unit_id);
-    container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
-    toast('Package added to the current selection. Press Save User to confirm.');
-  });
+
+  if (!isTargetStaff) {
+    const matrix=container.querySelector('#permissionMatrix');
+    state.years.forEach(year=>{
+      const y=document.createElement('div'); y.className='permission-group'; y.innerHTML=`<strong>${escapeHtml(year.name)}</strong>`;
+      state.grades.filter(g=>g.school_year_id===year.id).forEach(grade=>{
+        const units=state.units.filter(u=>u.grade_id===grade.id); const row=document.createElement('div');
+        row.innerHTML=`<div class="permission-grade"><span>${escapeHtml(grade.name)}</span><button class="btn btn-small btn-ghost" data-grade-all="${grade.id}">All</button></div>`;
+        const unitWrap=document.createElement('div'); unitWrap.className='permission-units';
+        units.forEach(unit=>{ const label=document.createElement('label'); label.innerHTML=`<input type="checkbox" data-unit-id="${unit.id}" ${checked.has(unit.id)?'checked':''}> ${escapeHtml(unit.name)}`; unitWrap.appendChild(label); });
+        row.appendChild(unitWrap); y.appendChild(row);
+      }); matrix.appendChild(y);
+    });
+    container.querySelectorAll('[data-grade-all]').forEach(btn=>btn.addEventListener('click',()=>{
+      const ids=state.units.filter(u=>u.grade_id===btn.dataset.gradeAll).map(u=>u.id);
+      container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
+    }));
+    container.querySelector('#allAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=true));
+    container.querySelector('#clearAccess').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>cb.checked=false));
+    container.querySelector('#unit1All').addEventListener('click',()=>container.querySelectorAll('[data-unit-id]').forEach(cb=>{ const unit=state.units.find(u=>u.id===cb.dataset.unitId); if(unit?.name.trim().toLowerCase()==='unit 1') cb.checked=true; }));
+    container.querySelector('#applyPackage').addEventListener('click',()=>{
+      const id=container.querySelector('#packageSelect').value; if(!id)return toast('Choose a package first.');
+      const ids=(packageUnits||[]).filter(x=>x.package_id===id).map(x=>x.unit_id);
+      container.querySelectorAll('[data-unit-id]').forEach(cb=>{ if(ids.includes(cb.dataset.unitId)) cb.checked=true; });
+      toast('Package added to the current selection. Press Save User to confirm.');
+    });
+    container.querySelector('#previewEffective').addEventListener('click',async()=>{
+      const {data,error:e}=await state.client.rpc('effective_unit_ids_for_user',{target_user:user.id});
+      if(e)return toast(e.message);
+      const ids=new Set((data||[]).map(x=>x.unit_id));
+      const paths=state.units.filter(u=>ids.has(u.id)).map(u=>unitPath(u.id));
+      alert(paths.length ? `Effective access for ${user.username}:\n\n${paths.join('\n')}` : `${user.username} currently has no effective Unit access.`);
+    });
+  }
   container.querySelector('#savePermissions').addEventListener('click',()=>saveUserAndPermissions(container,user));
 }
 
 async function saveUserAndPermissions(container,user) {
-  const selected=[...container.querySelectorAll('[data-unit-id]:checked')].map(cb=>cb.dataset.unitId);
   const status=container.querySelector('#userStatus').value;
   const role=container.querySelector('#userRole').value;
   const expiryRaw=container.querySelector('#userExpiry').value;
@@ -666,15 +725,22 @@ async function saveUserAndPermissions(container,user) {
   if (isOwner()) profilePatch.role = role;
   const {error:profileError}=await state.client.from('profiles').update(profilePatch).eq('id',user.id);
   if(profileError) return toast(profileError.message);
-  const {error:deleteError}=await state.client.from('user_unit_access').delete().eq('user_id',user.id);
-  if(deleteError) return toast(deleteError.message);
-  if(selected.length){
-    const rows=selected.map(unitId=>({user_id:user.id,unit_id:unitId,granted_by:state.session.user.id}));
-    const {error:insertError}=await state.client.from('user_unit_access').insert(rows);
-    if(insertError) return toast(insertError.message);
+
+  // Staff never need direct Unit rows. Their role grants complete access automatically.
+  if (!['admin','owner'].includes(role)) {
+    const selected=[...container.querySelectorAll('[data-unit-id]:checked')].map(cb=>cb.dataset.unitId);
+    const {error:deleteError}=await state.client.from('user_unit_access').delete().eq('user_id',user.id);
+    if(deleteError) return toast(deleteError.message);
+    if(selected.length){
+      const rows=selected.map(unitId=>({user_id:user.id,unit_id:unitId,granted_by:state.session.user.id}));
+      const {error:insertError}=await state.client.from('user_unit_access').insert(rows);
+      if(insertError) return toast(insertError.message);
+    }
+    await logAudit('user_updated','profile',user.id,{username:user.username,role:profilePatch.role||user.role,status,direct_units:selected.length});
+  } else {
+    await logAudit('staff_profile_updated','profile',user.id,{username:user.username,role,status,full_access:true});
   }
   Object.assign(user, profilePatch);
-  await logAudit('user_updated','profile',user.id,{username:user.username,role:profilePatch.role||user.role,status,units:selected.length});
   toast(`User ${user.username} saved.`);
   await loadAdminUsers(); render();
 }
@@ -740,6 +806,8 @@ function renderAdminContent(panel) {
       <label>Launch token life<select id="activityTtl"><option value="120">2 minutes</option><option value="180" selected>3 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select></label>
       <label class="wide">Title<input id="activityTitle" placeholder="Numbers Challenge"></label>
       <label class="wide">Real Game URL <span class="field-help">(Admin only)</span><input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
+      <label>Direct Game Gate<select id="activityGate"><option value="false">Not installed / unsure</option><option value="true">Installed</option></select></label>
+      <label>Security note<input id="activitySecurityNote" placeholder="Private GitHub repo, gate checked..."></label>
       <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Secure Activity</button></div>
     </div><hr class="soft"><h3>Existing activities</h3><div id="activityManageList" class="manage-list"></div>`;
   const yearSel=panel.querySelector('#activityYear'), gradeSel=panel.querySelector('#activityGrade'), unitSel=panel.querySelector('#activityUnit');
@@ -754,7 +822,7 @@ function renderAdminContent(panel) {
     try { new URL(targetUrl); } catch { return toast('The game URL is not valid.'); }
     const {data,error}=await state.client.from('activities').insert(row).select().single();
     if(error)return toast(error.message);
-    const target={activity_id:data.id,target_url:targetUrl,security_mode:panel.querySelector('#activitySecurity').value,launch_ttl_seconds:Number(panel.querySelector('#activityTtl').value),enabled:true};
+    const target={activity_id:data.id,target_url:targetUrl,security_mode:panel.querySelector('#activitySecurity').value,launch_ttl_seconds:Number(panel.querySelector('#activityTtl').value),gate_installed:panel.querySelector('#activityGate').value==='true',security_notes:panel.querySelector('#activitySecurityNote').value.trim()||null,enabled:true};
     const {error:targetError}=await state.client.from('activity_targets').insert(target);
     if(targetError){ await state.client.from('activities').delete().eq('id',data.id); return toast(targetError.message); }
     await logAudit('secure_activity_created','activity',data.id,{title:row.title,unit_id:row.unit_id,security_mode:target.security_mode});
@@ -775,7 +843,8 @@ async function loadManagedActivities(panel) {
     const target=targetMap.get(a.id);
     const mode=target?.security_mode||'not configured';
     const card=document.createElement('div'); card.className='manage-card';
-    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    const gateStatus=target?.gate_installed?'🟢 Game Gate':'🟡 Gate not confirmed';
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)} · ${gateStatus}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-gate>${target?.gate_installed?'Mark Gate Missing':'Mark Gate Installed'}</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
     card.querySelector('[data-edit]').addEventListener('click',async()=>{
       const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
       const url=prompt('Real game URL (Admin only)',target?.target_url||''); if(url===null||!url.trim())return;
@@ -783,16 +852,22 @@ async function loadManagedActivities(panel) {
       const modeInput=(prompt('Security mode: unit, members, or public',target?.security_mode||'unit')||'').trim().toLowerCase();
       if(!['unit','members','public'].includes(modeInput))return toast('Security mode must be unit, members, or public.');
       const {error:e}=await state.client.from('activities').update({title:title.trim()}).eq('id',a.id); if(e)return toast(e.message);
-      const {error:tErr}=await state.client.from('activity_targets').upsert({activity_id:a.id,target_url:url.trim(),security_mode:modeInput,launch_ttl_seconds:target?.launch_ttl_seconds||180,enabled:true},{onConflict:'activity_id'});
+      const {error:tErr}=await state.client.from('activity_targets').upsert({activity_id:a.id,target_url:url.trim(),security_mode:modeInput,launch_ttl_seconds:target?.launch_ttl_seconds||180,gate_installed:target?.gate_installed||false,security_notes:target?.security_notes||null,enabled:true},{onConflict:'activity_id'});
       if(tErr)return toast(tErr.message);
       await logAudit('secure_activity_updated','activity',a.id,{title:title.trim(),security_mode:modeInput});toast('Activity updated.');loadManagedActivities(panel);
+    });
+    card.querySelector('[data-gate]').addEventListener('click',async()=>{
+      if(!target)return toast('Secure target is not configured.');
+      const next=!target.gate_installed;
+      const {error:e}=await state.client.from('activity_targets').update({gate_installed:next}).eq('activity_id',a.id);
+      if(e)toast(e.message);else{await logAudit('game_gate_status_changed','activity',a.id,{gate_installed:next});toast(`Game Gate marked ${next?'installed':'missing'}.`);loadManagedActivities(panel);}
     });
     card.querySelector('[data-copy]').addEventListener('click',async()=>{
       const title=prompt('Title for the copy',`${a.title} Copy`); if(title===null||!title.trim())return;
       if(!target?.target_url)return toast('This activity has no protected target to copy.');
       const {data:copy,error:e}=await state.client.from('activities').insert({unit_id:a.unit_id,title:title.trim(),type:a.type,launch_url:null,thumbnail_url:a.thumbnail_url,sort_order:(a.sort_order||0)+1,published:a.published}).select().single();
       if(e)return toast(e.message);
-      const {error:tErr}=await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,enabled:target.enabled});
+      const {error:tErr}=await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,gate_installed:target.gate_installed||false,security_notes:target.security_notes||null,enabled:target.enabled});
       if(tErr){await state.client.from('activities').delete().eq('id',copy.id);return toast(tErr.message);}
       await logAudit('secure_activity_duplicated','activity',copy.id,{source:a.id});toast('Activity duplicated.');loadManagedActivities(panel);
     });
@@ -929,7 +1004,7 @@ async function duplicateUnit(unit) {
       const {data:copy,error:copyError}=await state.client.from('activities').insert({unit_id:newUnit.id,title:a.title,type:a.type,launch_url:null,thumbnail_url:a.thumbnail_url,sort_order:a.sort_order,published:a.published}).select().single();
       if(copyError)continue;
       const {data:target}=await state.client.from('activity_targets').select('*').eq('activity_id',a.id).maybeSingle();
-      if(target)await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,enabled:target.enabled});
+      if(target)await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,gate_installed:target.gate_installed||false,security_notes:target.security_notes||null,enabled:target.enabled});
     }
   }
   await logAudit('unit_duplicated','unit',newUnit.id,{source:unit.id}); await adminStructureRefresh('Unit duplicated.');
@@ -1034,11 +1109,20 @@ function renderAdminDesign(panel) {
 }
 
 function renderAdminSettings(panel) {
-  panel.innerHTML=`<h2>Settings</h2><div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin/Owner can create users.<br>ON: visitors can request an account, but every new account remains Pending until approved.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.settings.registration_enabled?'checked':''}><span class="slider"></span></label></div></div><p class="admin-note" style="margin-top:.7em">Recommended: keep registration OFF until you are ready to accept new users. Approved users receive no unit access automatically.</p>`;
+  panel.innerHTML=`
+    <h2>Settings</h2>
+    <div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin/Owner can create users.<br>ON: visitors can request an account, but every new account remains Pending until approved.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.settings.registration_enabled?'checked':''}><span class="slider"></span></label></div></div>
+    <div class="settings-card" style="margin-top:.65em"><div class="toggle-line"><div><strong>Community Forum</strong><p class="admin-note">Enable announcements, help, teaching ideas, game feedback and Grade/Unit discussions.</p></div><label class="switch"><input id="communityToggle" type="checkbox" ${state.settings.community_enabled?'checked':''}><span class="slider"></span></label></div></div>
+    <p class="admin-note" style="margin-top:.7em">Approved users receive no direct Unit access automatically unless you assign them to an Access Group or grant individual Units.</p>`;
   panel.querySelector('#registrationToggle').addEventListener('change',async(e)=>{
     const value=e.target.checked;
     const {error}=await state.client.from('portal_settings').update({registration_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
     if(error){e.target.checked=!value;return toast(error.message);} state.settings.registration_enabled=value;await logAudit('registration_toggled','portal_settings','1',{enabled:value});toast(`Public registration ${value?'enabled':'disabled'}.`);
+  });
+  panel.querySelector('#communityToggle').addEventListener('change',async(e)=>{
+    const value=e.target.checked;
+    const {error}=await state.client.from('portal_settings').update({community_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
+    if(error){e.target.checked=!value;return toast(error.message);} state.settings.community_enabled=value;await logAudit('community_toggled','portal_settings','1',{enabled:value});toast(`Community ${value?'enabled':'disabled'}.`);
   });
 }
 
@@ -1054,6 +1138,196 @@ async function renderAdminAudit(panel) {
     card.innerHTML=`<strong>${escapeHtml(row.action)}</strong><div class="meta">${escapeHtml(row.entity_type||'')} ${escapeHtml(row.entity_id||'')}</div><div class="audit-time">${escapeHtml(users.get(row.actor_id)||'system')} · ${new Date(row.created_at).toLocaleString()}</div>`;
     list.appendChild(card);
   });
+}
+
+
+// ---------------------------------------------------------------------------
+// v1.4 Dynamic Access Groups
+// ---------------------------------------------------------------------------
+function accessRuleLabel(rule) {
+  if (rule.scope_type === 'all') return 'Entire Learning Hub · current + future content';
+  if (rule.scope_type === 'year') {
+    const y=state.years.find(x=>x.id===rule.school_year_id);
+    return `${y?.name || 'Year'} · all current + future Grades/Units`;
+  }
+  if (rule.scope_type === 'grade') {
+    const g=state.grades.find(x=>x.id===rule.grade_id);
+    const y=state.years.find(x=>x.id===g?.school_year_id);
+    return `${y?.name || ''} / ${g?.name || 'Grade'} · all current + future Units`;
+  }
+  if (rule.scope_type === 'unit') return unitPath(rule.unit_id) || 'Specific Unit';
+  return rule.scope_type;
+}
+
+function renderAdminGroups(panel) {
+  panel.innerHTML=`
+    <h2>Dynamic Access Groups</h2>
+    <p class="admin-note">Use Groups for paid plans. A Grade or Year rule automatically includes new Units/Games created later, so you do not need to edit every member again.</p>
+    <div class="admin-form-grid">
+      <label>Group name<input id="groupName" placeholder="2026 Grade 3 Full Access"></label>
+      <label>Description<input id="groupDescription" placeholder="Includes future Units"></label>
+      <div class="wide"><button id="createGroup" class="btn btn-accent">+ Create Access Group</button></div>
+    </div>
+    <hr class="soft">
+    <div class="admin-form-grid" style="grid-template-columns:.72fr 1.28fr">
+      <div><h3>Groups</h3><div id="groupList" class="user-list"></div></div>
+      <div id="groupEditor"><p class="admin-note">Select a group to manage its members and dynamic access rules.</p></div>
+    </div>`;
+
+  panel.querySelector('#createGroup').addEventListener('click',async()=>{
+    const name=panel.querySelector('#groupName').value.trim();
+    const description=panel.querySelector('#groupDescription').value.trim();
+    if(!name)return toast('Add a group name.');
+    const {data,error}=await state.client.from('access_groups').insert({name,description:description||null,active:true,created_by:state.session.user.id}).select().single();
+    if(error)return toast(error.message);
+    await logAudit('access_group_created','access_group',data.id,{name});
+    await loadAccessGroups(); state.selectedAccessGroup=data; toast('Access Group created.'); render();
+  });
+
+  const list=panel.querySelector('#groupList');
+  if(!state.accessGroups.length) list.innerHTML='<p class="admin-note">No groups yet.</p>';
+  state.accessGroups.forEach(group=>{
+    const row=document.createElement('button');
+    row.className=`user-row ${state.selectedAccessGroup?.id===group.id?'active':''}`;
+    row.innerHTML=`<span><strong>${escapeHtml(group.name)}</strong><br><small>${escapeHtml(group.description||'')}</small></span><small>${group.active?'Active':'Disabled'}</small>`;
+    row.addEventListener('click',()=>{state.selectedAccessGroup=group;renderAccessGroupEditor(panel.querySelector('#groupEditor'),group);list.querySelectorAll('.user-row').forEach(x=>x.classList.remove('active'));row.classList.add('active');});
+    list.appendChild(row);
+  });
+  if(state.selectedAccessGroup)renderAccessGroupEditor(panel.querySelector('#groupEditor'),state.selectedAccessGroup);
+}
+
+async function renderAccessGroupEditor(container,group) {
+  container.innerHTML='<p class="admin-note">Loading group…</p>';
+  const [{data:members,error:mErr},{data:rules,error:rErr}]=await Promise.all([
+    state.client.from('access_group_members').select('*').eq('group_id',group.id),
+    state.client.from('access_group_rules').select('*').eq('group_id',group.id).order('created_at')
+  ]);
+  if(mErr||rErr){container.textContent=(mErr||rErr).message;return;}
+  const memberIds=new Set((members||[]).map(m=>m.user_id));
+  const users=state.adminUsers.filter(u=>u.role==='user' && u.status!=='pending');
+  container.innerHTML=`
+    <div class="manage-card"><div><strong>${escapeHtml(group.name)}</strong><div class="meta">Dynamic plan: matching future content is included automatically.</div></div><div class="actions"><button id="toggleGroup" class="btn btn-small btn-ghost">${group.active?'Disable':'Enable'}</button><button id="deleteGroup" class="btn btn-small btn-danger">Delete</button></div></div>
+    <h3 style="margin-top:.7em">Members</h3>
+    <div class="group-member-grid">${users.map(u=>`<label><input type="checkbox" data-group-member="${u.id}" ${memberIds.has(u.id)?'checked':''}> ${escapeHtml(u.username)} <small>${escapeHtml(u.display_name||'')}</small></label>`).join('') || '<span class="admin-note">No normal users available.</span>'}</div>
+    <button id="saveGroupMembers" class="btn btn-accent btn-small" style="margin-top:.5em">Save Members</button>
+    <hr class="soft"><h3>Dynamic Access Rules</h3>
+    <div class="admin-form-grid">
+      <label>Scope<select id="groupRuleScope"><option value="all">Entire Learning Hub</option><option value="year">Year</option><option value="grade">Grade</option><option value="unit">Specific Unit</option></select></label>
+      <label>Target<select id="groupRuleTarget"></select></label>
+      <div class="wide"><button id="addGroupRule" class="btn btn-accent btn-small">+ Add Dynamic Rule</button></div>
+    </div>
+    <p class="admin-note">A Grade rule includes Units you create next month or next year inside that Grade. A Year rule includes future Grades and Units in that Year.</p>
+    <div id="groupRuleList" class="manage-list"></div>`;
+
+  const scope=container.querySelector('#groupRuleScope'),target=container.querySelector('#groupRuleTarget');
+  const refreshTargets=()=>{
+    if(scope.value==='all'){target.innerHTML='<option value="">All content</option>';target.disabled=true;return;}
+    target.disabled=false;
+    if(scope.value==='year')target.innerHTML=state.years.map(y=>`<option value="${y.id}">${escapeHtml(y.name)}</option>`).join('');
+    if(scope.value==='grade')target.innerHTML=state.grades.map(g=>{const y=state.years.find(x=>x.id===g.school_year_id);return `<option value="${g.id}">${escapeHtml(y?.name||'')} / ${escapeHtml(g.name)}</option>`;}).join('');
+    if(scope.value==='unit')target.innerHTML=state.units.map(u=>`<option value="${u.id}">${escapeHtml(unitPath(u.id))}</option>`).join('');
+  };
+  scope.addEventListener('change',refreshTargets);refreshTargets();
+
+  container.querySelector('#saveGroupMembers').addEventListener('click',async()=>{
+    const selected=[...container.querySelectorAll('[data-group-member]:checked')].map(x=>x.dataset.groupMember);
+    const {error:dErr}=await state.client.from('access_group_members').delete().eq('group_id',group.id);if(dErr)return toast(dErr.message);
+    if(selected.length){const rows=selected.map(user_id=>({group_id:group.id,user_id,added_by:state.session.user.id}));const {error:iErr}=await state.client.from('access_group_members').insert(rows);if(iErr)return toast(iErr.message);}
+    await logAudit('access_group_members_saved','access_group',group.id,{members:selected.length});toast('Group members saved.');
+  });
+
+  container.querySelector('#addGroupRule').addEventListener('click',async()=>{
+    const scopeType=scope.value;const value=target.value;
+    const row={group_id:group.id,scope_type:scopeType,active:true,school_year_id:null,grade_id:null,unit_id:null};
+    if(scopeType==='year')row.school_year_id=value;
+    if(scopeType==='grade')row.grade_id=value;
+    if(scopeType==='unit')row.unit_id=value;
+    const {data,error}=await state.client.from('access_group_rules').insert(row).select().single();if(error)return toast(error.message);
+    await logAudit('access_group_rule_created','access_group_rule',data.id,{group:group.name,scope:scopeType});toast('Dynamic rule added.');renderAccessGroupEditor(container,group);
+  });
+
+  container.querySelector('#toggleGroup').addEventListener('click',async()=>{const next=!group.active;const {error}=await state.client.from('access_groups').update({active:next}).eq('id',group.id);if(error)return toast(error.message);group.active=next;await loadAccessGroups();toast(`Group ${next?'enabled':'disabled'}.`);render();});
+  container.querySelector('#deleteGroup').addEventListener('click',async()=>{if(!confirm(`Delete access group ${group.name}? Members will lose access supplied only by this group.`))return;const {error}=await state.client.from('access_groups').delete().eq('id',group.id);if(error)return toast(error.message);state.selectedAccessGroup=null;await loadAccessGroups();await logAudit('access_group_deleted','access_group',group.id,{name:group.name});toast('Group deleted.');render();});
+
+  const ruleList=container.querySelector('#groupRuleList');
+  if(!rules?.length)ruleList.innerHTML='<p class="admin-note">No dynamic rules yet.</p>';
+  (rules||[]).forEach(rule=>{
+    const card=document.createElement('div');card.className='manage-card';card.innerHTML=`<div><strong>${escapeHtml(accessRuleLabel(rule))}</strong><div class="meta">${rule.active?'Active':'Disabled'}</div></div><div class="actions"><button class="btn btn-small btn-danger">Remove</button></div>`;
+    card.querySelector('button').addEventListener('click',async()=>{const {error}=await state.client.from('access_group_rules').delete().eq('id',rule.id);if(error)return toast(error.message);await logAudit('access_group_rule_deleted','access_group_rule',rule.id,{});renderAccessGroupEditor(container,group);});ruleList.appendChild(card);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// v1.4 Community Forum
+// ---------------------------------------------------------------------------
+async function renderCommunity() {
+  setHeader('Community', ['Community']);
+  els.content.innerHTML='<div class="empty-state">Loading community…</div>';
+  const {data,error}=await state.client.from('forum_categories').select('*').eq('enabled',true).order('sort_order');
+  if(state.view!=='community')return;
+  els.content.innerHTML='';
+  if(error){els.content.innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;return;}
+  const grid=document.createElement('div');grid.className='community-grid';
+  (data||[]).forEach(cat=>{
+    const card=document.createElement('button');card.className='community-category';
+    card.innerHTML=`<span class="community-icon">${escapeHtml(cat.icon||'💬')}</span><strong>${escapeHtml(cat.name)}</strong><span>${escapeHtml(cat.description||'')}</span>${cat.staff_only_post?'<small>Admin announcements</small>':''}`;
+    card.addEventListener('click',()=>{state.communityCategory=cat;state.view='communityCategory';render();});grid.appendChild(card);
+  });
+  if(!data?.length)els.content.innerHTML='<div class="empty-state">Community is enabled, but no categories are available.</div>';else els.content.appendChild(grid);
+}
+
+async function renderCommunityCategory() {
+  const cat=state.communityCategory;if(!cat){state.view='community';return render();}
+  setHeader(cat.name,['Community',cat.name]);
+  els.content.innerHTML='<div class="empty-state">Loading discussions…</div>';
+  const {data:topics,error}=await state.client.from('forum_topics').select('*').eq('category_id',cat.id).is('deleted_at',null).order('pinned',{ascending:false}).order('created_at',{ascending:false});
+  if(state.view!=='communityCategory')return;
+  els.content.innerHTML='';if(error){els.content.innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;return;}
+  const canPost=!cat.staff_only_post||isStaff();
+  if(canPost){
+    const form=document.createElement('div');form.className='community-compose';
+    form.innerHTML=`<h3>Start a discussion</h3><input id="topicTitle" placeholder="Topic title"><textarea id="topicBody" rows="3" placeholder="Write your message…"></textarea><select id="topicUnit"><option value="">No Grade/Unit attachment</option>${state.units.filter(u=>isStaff()||state.ownAccess.has(u.id)).map(u=>`<option value="${u.id}">${escapeHtml(unitPath(u.id))}</option>`).join('')}</select><button id="createTopic" class="btn btn-accent btn-small">Post Topic</button>`;
+    form.querySelector('#createTopic').addEventListener('click',async()=>{
+      const title=form.querySelector('#topicTitle').value.trim(),body=form.querySelector('#topicBody').value.trim(),unitId=form.querySelector('#topicUnit').value||null;if(!title||!body)return toast('Add a title and message.');
+      const unit=state.units.find(u=>u.id===unitId);const authorLabel=state.profile.display_name||state.profile.username||'Member';
+      const {error:e}=await state.client.from('forum_topics').insert({category_id:cat.id,author_id:state.session.user.id,author_label:authorLabel,title,body,unit_id:unitId,grade_id:unit?.grade_id||null});if(e)return toast(e.message);await logAudit('forum_topic_created','forum_category',cat.id,{title});toast('Discussion posted.');renderCommunityCategory();
+    });
+    els.content.appendChild(form);
+  }
+  const list=document.createElement('div');list.className='community-topic-list';
+  if(!topics?.length)list.innerHTML='<p class="admin-note">No discussions yet.</p>';
+  (topics||[]).forEach(topic=>{
+    const card=document.createElement('div');card.className=`community-topic ${topic.pinned?'pinned':''}`;
+    card.innerHTML=`<div class="topic-main"><strong>${topic.pinned?'📌 ':''}${escapeHtml(topic.title)} ${topic.locked?'🔒':''}</strong><div class="meta">${escapeHtml(topic.author_label)} · ${new Date(topic.created_at).toLocaleString()}${topic.unit_id?` · ${escapeHtml(unitPath(topic.unit_id))}`:''}</div><p>${escapeHtml(topic.body).slice(0,220)}</p></div><div class="actions"><button class="btn btn-small btn-ghost" data-open>Open</button>${isStaff()?'<button class="btn btn-small btn-ghost" data-pin>Pin</button><button class="btn btn-small btn-ghost" data-lock>Lock</button><button class="btn btn-small btn-danger" data-delete>Remove</button>':''}</div>`;
+    card.querySelector('[data-open]').addEventListener('click',()=>{state.communityTopic=topic;state.view='communityTopic';render();});
+    if(isStaff()){
+      card.querySelector('[data-pin]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_topics').update({pinned:!topic.pinned}).eq('id',topic.id);if(e)toast(e.message);else renderCommunityCategory();});
+      card.querySelector('[data-lock]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_topics').update({locked:!topic.locked}).eq('id',topic.id);if(e)toast(e.message);else renderCommunityCategory();});
+      card.querySelector('[data-delete]').addEventListener('click',async()=>{if(!confirm('Remove this discussion?'))return;const {error:e}=await state.client.from('forum_topics').update({deleted_at:new Date().toISOString()}).eq('id',topic.id);if(e)toast(e.message);else renderCommunityCategory();});
+    }
+    list.appendChild(card);
+  });
+  els.content.appendChild(list);
+}
+
+async function renderCommunityTopic() {
+  const topic=state.communityTopic,cat=state.communityCategory;if(!topic||!cat){state.view='community';return render();}
+  setHeader(topic.title,['Community',cat.name,topic.title]);
+  els.content.innerHTML='<div class="empty-state">Loading replies…</div>';
+  const {data:posts,error}=await state.client.from('forum_posts').select('*').eq('topic_id',topic.id).is('deleted_at',null).order('created_at');
+  if(state.view!=='communityTopic')return;
+  els.content.innerHTML='';if(error){els.content.innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;return;}
+  const head=document.createElement('article');head.className='forum-topic-detail';head.innerHTML=`<h2>${topic.pinned?'📌 ':''}${escapeHtml(topic.title)} ${topic.locked?'🔒':''}</h2><div class="meta">${escapeHtml(topic.author_label)} · ${new Date(topic.created_at).toLocaleString()}${topic.unit_id?` · ${escapeHtml(unitPath(topic.unit_id))}`:''}</div><p>${escapeHtml(topic.body).replace(/\n/g,'<br>')}</p>`;els.content.appendChild(head);
+  const list=document.createElement('div');list.className='forum-post-list';(posts||[]).forEach(post=>{const card=document.createElement('div');card.className='forum-post';card.innerHTML=`<div><strong>${escapeHtml(post.author_label)}</strong><span class="meta"> ${new Date(post.created_at).toLocaleString()}</span><p>${escapeHtml(post.body).replace(/\n/g,'<br>')}</p></div>${isStaff()?'<button class="btn btn-small btn-danger">Remove</button>':''}`;if(isStaff())card.querySelector('button').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_posts').update({deleted_at:new Date().toISOString()}).eq('id',post.id);if(e)toast(e.message);else renderCommunityTopic();});list.appendChild(card);});els.content.appendChild(list);
+  if(!topic.locked||isStaff()){
+    const reply=document.createElement('div');reply.className='community-compose';reply.innerHTML=`<textarea id="replyBody" rows="3" placeholder="Write a reply…"></textarea><button id="postReply" class="btn btn-accent btn-small">Reply</button>`;reply.querySelector('#postReply').addEventListener('click',async()=>{const body=reply.querySelector('#replyBody').value.trim();if(!body)return;const authorLabel=state.profile.display_name||state.profile.username||'Member';const {error:e}=await state.client.from('forum_posts').insert({topic_id:topic.id,author_id:state.session.user.id,author_label:authorLabel,body});if(e)return toast(e.message);toast('Reply posted.');renderCommunityTopic();});els.content.appendChild(reply);
+  }
+}
+
+async function renderAdminCommunity(panel) {
+  panel.innerHTML='<h2>Community Management</h2><p class="admin-note">Manage forum sections. Moderation of individual discussions is available directly inside Community.</p><div class="admin-form-grid"><label>Name<input id="newCommunityName" placeholder="Parent Questions"></label><label>Icon<input id="newCommunityIcon" value="💬"></label><label class="wide">Description<input id="newCommunityDescription" placeholder="Optional description"></label><label>Who can start topics?<select id="newCommunityStaff"><option value="false">All active members</option><option value="true">Admin/Owner only</option></select></label><div style="display:flex;align-items:end"><button id="addCommunityCategory" class="btn btn-accent">+ Category</button></div></div><hr class="soft"><div id="communityCategoryAdmin" class="manage-list">Loading…</div>';
+  panel.querySelector('#addCommunityCategory').addEventListener('click',async()=>{const name=panel.querySelector('#newCommunityName').value.trim();if(!name)return toast('Add a category name.');const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');const row={name,slug:slug||`category-${Date.now()}`,icon:panel.querySelector('#newCommunityIcon').value.trim()||'💬',description:panel.querySelector('#newCommunityDescription').value.trim()||null,staff_only_post:panel.querySelector('#newCommunityStaff').value==='true',enabled:true,sort_order:100};const {error}=await state.client.from('forum_categories').insert(row);if(error)return toast(error.message);await logAudit('forum_category_created','forum_category',null,{name});renderAdminCommunity(panel);});
+  const {data,error}=await state.client.from('forum_categories').select('*').order('sort_order');if(state.adminTab!=='communityAdmin')return;const list=panel.querySelector('#communityCategoryAdmin');if(error){list.textContent=error.message;return;}list.innerHTML='';(data||[]).forEach(cat=>{const card=document.createElement('div');card.className='manage-card';card.innerHTML=`<div><strong>${escapeHtml(cat.icon)} ${escapeHtml(cat.name)}</strong><div class="meta">${cat.enabled?'Enabled':'Disabled'} · ${cat.staff_only_post?'Admin posts only':'Members can post'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-enabled>${cat.enabled?'Disable':'Enable'}</button><button class="btn btn-small btn-ghost" data-staff>${cat.staff_only_post?'Allow Members':'Admin Only'}</button></div>`;card.querySelector('[data-enabled]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_categories').update({enabled:!cat.enabled}).eq('id',cat.id);if(e)toast(e.message);else renderAdminCommunity(panel);});card.querySelector('[data-staff]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_categories').update({staff_only_post:!cat.staff_only_post}).eq('id',cat.id);if(e)toast(e.message);else renderAdminCommunity(panel);});list.appendChild(card);});
 }
 
 boot();
