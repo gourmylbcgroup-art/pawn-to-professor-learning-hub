@@ -384,7 +384,10 @@ function renderUnits() {
 async function renderActivities() {
   setHeader(state.unit.name, [state.year.name, state.grade.name, state.unit.name]);
   els.content.innerHTML = '<div class="empty-state">Loading activities…</div>';
-  const { data, error } = await state.client.from('activities').select('*').eq('unit_id', state.unit.id).eq('published', true).order('sort_order');
+  // Deliberately do NOT request launch_url. v1.3 keeps the real destination server-side.
+  const { data, error } = await state.client.from('activities')
+    .select('id,unit_id,title,type,thumbnail_url,sort_order,published')
+    .eq('unit_id', state.unit.id).eq('published', true).order('sort_order');
   if (state.view !== 'activities') return;
   els.content.innerHTML = '';
   if (error) { els.content.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; return; }
@@ -392,9 +395,9 @@ async function renderActivities() {
   const list = document.createElement('div'); list.className = 'activity-list';
   data.forEach(a => {
     const card = document.createElement('article'); card.className='activity-card';
-    card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')}</p>`;
-    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Open ▶';
-    btn.addEventListener('click',()=>window.open(a.launch_url,'_blank','noopener,noreferrer'));
+    card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')} · Secure launch</p>`;
+    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='PLAY 🔐';
+    btn.addEventListener('click',()=>window.open(`/play.html?activity=${encodeURIComponent(a.id)}`,'_blank','noopener,noreferrer'));
     card.appendChild(btn); list.appendChild(card);
   });
   els.content.appendChild(list);
@@ -729,47 +732,73 @@ function renderAdminContent(panel) {
   const {yearOptions}=buildHierarchyOptions();
   panel.innerHTML=`
     <h2>Games & Activities</h2>
+    <p class="admin-note">v1.3 Secure Launcher keeps the real game URL in a protected table. Members only receive a secure PLAY link.</p>
     <div class="admin-form-grid">
       <label>Year<select id="activityYear">${yearOptions}</select></label><label>Grade<select id="activityGrade"></select></label>
       <label>Unit<select id="activityUnit"></select></label><label>Type<select id="activityType"><option>Game</option><option>Interactive Lesson</option><option>Worksheet</option><option>Quiz</option><option>External Link</option></select></label>
+      <label>Security<select id="activitySecurity"><option value="unit" selected>Unit Protected</option><option value="members">Any Active Member</option><option value="public">Public</option></select></label>
+      <label>Launch token life<select id="activityTtl"><option value="120">2 minutes</option><option value="180" selected>3 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select></label>
       <label class="wide">Title<input id="activityTitle" placeholder="Numbers Challenge"></label>
-      <label class="wide">Launch URL<input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
-      <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Activity</button></div>
+      <label class="wide">Real Game URL <span class="field-help">(Admin only)</span><input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
+      <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Secure Activity</button></div>
     </div><hr class="soft"><h3>Existing activities</h3><div id="activityManageList" class="manage-list"></div>`;
   const yearSel=panel.querySelector('#activityYear'), gradeSel=panel.querySelector('#activityGrade'), unitSel=panel.querySelector('#activityUnit');
   const refreshUnits=()=>{ const us=state.units.filter(u=>u.grade_id===gradeSel.value); unitSel.innerHTML=us.map(u=>`<option value="${u.id}">${escapeHtml(u.name)}</option>`).join(''); loadManagedActivities(panel); };
   const refreshGrades=()=>{ const gs=state.grades.filter(g=>g.school_year_id===yearSel.value); gradeSel.innerHTML=gs.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join(''); refreshUnits(); };
   yearSel.addEventListener('change',refreshGrades); gradeSel.addEventListener('change',refreshUnits); unitSel.addEventListener('change',()=>loadManagedActivities(panel)); refreshGrades();
   panel.querySelector('#addActivity').addEventListener('click',async()=>{
-    const row={unit_id:unitSel.value,title:panel.querySelector('#activityTitle').value.trim(),type:panel.querySelector('#activityType').value,launch_url:panel.querySelector('#activityUrl').value.trim(),published:true,sort_order:10};
-    if(!row.unit_id||!row.title||!row.launch_url)return toast('Choose a unit and add a title and URL.');
+    const title=panel.querySelector('#activityTitle').value.trim();
+    const targetUrl=panel.querySelector('#activityUrl').value.trim();
+    const row={unit_id:unitSel.value,title,type:panel.querySelector('#activityType').value,launch_url:null,published:true,sort_order:10};
+    if(!row.unit_id||!row.title||!targetUrl)return toast('Choose a unit and add a title and real game URL.');
+    try { new URL(targetUrl); } catch { return toast('The game URL is not valid.'); }
     const {data,error}=await state.client.from('activities').insert(row).select().single();
-    if(error)toast(error.message);else{await logAudit('activity_created','activity',data.id,{title:row.title,unit_id:row.unit_id});toast('Activity published.');panel.querySelector('#activityTitle').value='';panel.querySelector('#activityUrl').value='';loadManagedActivities(panel);}
+    if(error)return toast(error.message);
+    const target={activity_id:data.id,target_url:targetUrl,security_mode:panel.querySelector('#activitySecurity').value,launch_ttl_seconds:Number(panel.querySelector('#activityTtl').value),enabled:true};
+    const {error:targetError}=await state.client.from('activity_targets').insert(target);
+    if(targetError){ await state.client.from('activities').delete().eq('id',data.id); return toast(targetError.message); }
+    await logAudit('secure_activity_created','activity',data.id,{title:row.title,unit_id:row.unit_id,security_mode:target.security_mode});
+    toast('Secure activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; loadManagedActivities(panel);
   });
 }
 
 async function loadManagedActivities(panel) {
   const unitId=panel.querySelector('#activityUnit')?.value; const list=panel.querySelector('#activityManageList'); if(!unitId||!list)return;
   list.innerHTML='Loading…';
-  const {data,error}=await state.client.from('activities').select('*').eq('unit_id',unitId).order('sort_order');
+  const {data,error}=await state.client.from('activities').select('id,unit_id,title,type,thumbnail_url,sort_order,published').eq('unit_id',unitId).order('sort_order');
   if(error){list.textContent=error.message;return;} list.innerHTML='';
   if(!data?.length){list.innerHTML='<p class="admin-note">No activities in this unit yet.</p>';return;}
+  const ids=data.map(a=>a.id);
+  const {data:targets}=await state.client.from('activity_targets').select('*').in('activity_id',ids);
+  const targetMap=new Map((targets||[]).map(t=>[t.activity_id,t]));
   data.forEach(a=>{
+    const target=targetMap.get(a.id);
+    const mode=target?.security_mode||'not configured';
     const card=document.createElement('div'); card.className='manage-card';
-    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
     card.querySelector('[data-edit]').addEventListener('click',async()=>{
       const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
-      const url=prompt('Launch URL',a.launch_url); if(url===null||!url.trim())return;
-      const {error:e}=await state.client.from('activities').update({title:title.trim(),launch_url:url.trim()}).eq('id',a.id); if(e)toast(e.message);else{await logAudit('activity_updated','activity',a.id,{title:title.trim()});toast('Activity updated.');loadManagedActivities(panel);}
+      const url=prompt('Real game URL (Admin only)',target?.target_url||''); if(url===null||!url.trim())return;
+      try { new URL(url.trim()); } catch { return toast('The game URL is not valid.'); }
+      const modeInput=(prompt('Security mode: unit, members, or public',target?.security_mode||'unit')||'').trim().toLowerCase();
+      if(!['unit','members','public'].includes(modeInput))return toast('Security mode must be unit, members, or public.');
+      const {error:e}=await state.client.from('activities').update({title:title.trim()}).eq('id',a.id); if(e)return toast(e.message);
+      const {error:tErr}=await state.client.from('activity_targets').upsert({activity_id:a.id,target_url:url.trim(),security_mode:modeInput,launch_ttl_seconds:target?.launch_ttl_seconds||180,enabled:true},{onConflict:'activity_id'});
+      if(tErr)return toast(tErr.message);
+      await logAudit('secure_activity_updated','activity',a.id,{title:title.trim(),security_mode:modeInput});toast('Activity updated.');loadManagedActivities(panel);
     });
     card.querySelector('[data-copy]').addEventListener('click',async()=>{
       const title=prompt('Title for the copy',`${a.title} Copy`); if(title===null||!title.trim())return;
-      const {data:copy,error:e}=await state.client.from('activities').insert({unit_id:a.unit_id,title:title.trim(),type:a.type,launch_url:a.launch_url,thumbnail_url:a.thumbnail_url,sort_order:(a.sort_order||0)+1,published:a.published}).select().single();
-      if(e)toast(e.message);else{await logAudit('activity_duplicated','activity',copy.id,{source:a.id});toast('Activity duplicated.');loadManagedActivities(panel);}
+      if(!target?.target_url)return toast('This activity has no protected target to copy.');
+      const {data:copy,error:e}=await state.client.from('activities').insert({unit_id:a.unit_id,title:title.trim(),type:a.type,launch_url:null,thumbnail_url:a.thumbnail_url,sort_order:(a.sort_order||0)+1,published:a.published}).select().single();
+      if(e)return toast(e.message);
+      const {error:tErr}=await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,enabled:target.enabled});
+      if(tErr){await state.client.from('activities').delete().eq('id',copy.id);return toast(tErr.message);}
+      await logAudit('secure_activity_duplicated','activity',copy.id,{source:a.id});toast('Activity duplicated.');loadManagedActivities(panel);
     });
     card.querySelector('[data-move]').addEventListener('change',async(e)=>{
-      const target=e.target.value; if(!target||target===a.unit_id)return;
-      const {error:moveError}=await state.client.from('activities').update({unit_id:target}).eq('id',a.id); if(moveError)toast(moveError.message);else{await logAudit('activity_moved','activity',a.id,{to:target});toast('Activity moved.');loadManagedActivities(panel);}
+      const moveTo=e.target.value; if(!moveTo||moveTo===a.unit_id)return;
+      const {error:moveError}=await state.client.from('activities').update({unit_id:moveTo}).eq('id',a.id); if(moveError)toast(moveError.message);else{await logAudit('activity_moved','activity',a.id,{to:moveTo});toast('Activity moved.');loadManagedActivities(panel);}
     });
     card.querySelector('[data-toggle]').addEventListener('click',async()=>{ const {error:e}=await state.client.from('activities').update({published:!a.published}).eq('id',a.id); if(e)toast(e.message);else{await logAudit('activity_visibility_changed','activity',a.id,{published:!a.published});toast(a.published?'Activity hidden.':'Activity published.');loadManagedActivities(panel);} });
     list.appendChild(card);
@@ -895,8 +924,13 @@ async function duplicateUnit(unit) {
   const name=prompt('Name for duplicated unit',`${unit.name} Copy`); if(name===null||!name.trim())return;
   const {data:newUnit,error}=await state.client.from('units').insert({grade_id:unit.grade_id,name:name.trim(),title:unit.title,sort_order:(unit.sort_order||0)+1,is_published:true}).select().single(); if(error)return toast(error.message);
   if(confirm('Copy the activities from the original unit too?')){
-    const {data:activities}=await state.client.from('activities').select('*').eq('unit_id',unit.id);
-    if(activities?.length)await state.client.from('activities').insert(activities.map(a=>({unit_id:newUnit.id,title:a.title,type:a.type,launch_url:a.launch_url,thumbnail_url:a.thumbnail_url,sort_order:a.sort_order,published:a.published})));
+    const {data:activities}=await state.client.from('activities').select('id,title,type,thumbnail_url,sort_order,published').eq('unit_id',unit.id);
+    for(const a of (activities||[])){
+      const {data:copy,error:copyError}=await state.client.from('activities').insert({unit_id:newUnit.id,title:a.title,type:a.type,launch_url:null,thumbnail_url:a.thumbnail_url,sort_order:a.sort_order,published:a.published}).select().single();
+      if(copyError)continue;
+      const {data:target}=await state.client.from('activity_targets').select('*').eq('activity_id',a.id).maybeSingle();
+      if(target)await state.client.from('activity_targets').insert({activity_id:copy.id,target_url:target.target_url,security_mode:target.security_mode,launch_ttl_seconds:target.launch_ttl_seconds,enabled:target.enabled});
+    }
   }
   await logAudit('unit_duplicated','unit',newUnit.id,{source:unit.id}); await adminStructureRefresh('Unit duplicated.');
 }

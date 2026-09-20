@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Secure Activity — Pawn to Professor</title>
+  <link rel="stylesheet" href="./play.css" />
+</head>
+<body>
+  <main class="player-shell">
+    <header class="player-bar">
+      <div>
+        <div class="kicker">PAWN TO PROFESSOR</div>
+        <h1 id="playerTitle">Opening activity…</h1>
+      </div>
+      <div class="player-actions">
+        <button id="backBtn" type="button">← Back</button>
+        <button id="retryBtn" type="button" class="hidden">Try again</button>
+      </div>
+    </header>
+
+    <section id="status" class="status-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <strong>Checking your access…</strong>
+      <span>This secure link only works for an authorized account.</span>
+    </section>
+
+    <iframe id="gameFrame" class="hidden" title="Learning activity" allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./play.js" defer></script>
+</body>
+</html>

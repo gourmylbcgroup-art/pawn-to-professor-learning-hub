@@ -1,0 +1,14 @@
+Add this as the FIRST script inside the <head> of each paid/protected HTML5 game:
+
+<script src="./ptp-game-gate.js"></script>
+
+Then copy ptp-game-gate.js into the root of that game's repository.
+
+IMPORTANT:
+1. Open ptp-game-gate.js.
+2. Set TRUSTED_HUB to your real Learning Hub address.
+3. Deploy the game again.
+4. Opening the game URL directly should now show "Protected activity".
+5. Opening it through the Learning Hub PLAY button should work.
+
+For paid games, keep the GitHub source repository PRIVATE when possible.

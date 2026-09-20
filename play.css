@@ -1,0 +1,18 @@
+:root { color-scheme: dark; --green:#0f5a42; --mint:#75e0b3; --yellow:#ffd04a; }
+* { box-sizing:border-box; }
+html,body { margin:0; width:100%; height:100%; font-family:Inter,"Segoe UI",system-ui,sans-serif; background:#082f25; color:#fff; }
+body { overflow:hidden; }
+.hidden { display:none !important; }
+.player-shell { height:100%; display:grid; grid-template-rows:auto 1fr; background:linear-gradient(180deg,#0e5c43,#072f25); }
+.player-bar { min-height:74px; display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.8rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.18); box-shadow:0 5px 20px rgba(0,0,0,.18); }
+.kicker { color:var(--yellow); font-weight:900; letter-spacing:.14em; font-size:.72rem; }
+h1 { margin:.15rem 0 0; font-size:clamp(1.05rem,2vw,1.55rem); }
+.player-actions { display:flex; gap:.55rem; }
+button { border:0; border-radius:999px; padding:.65rem 1rem; font-weight:900; background:var(--mint); color:#103b30; cursor:pointer; }
+#backBtn { background:rgba(255,255,255,.13); color:#fff; border:1px solid rgba(255,255,255,.2); }
+.status-card { align-self:center; justify-self:center; display:grid; justify-items:center; gap:.8rem; text-align:center; max-width:520px; padding:2rem; color:rgba(255,255,255,.88); }
+.status-card strong { color:#fff; font-size:1.2rem; }
+.status-card.error strong { color:#ffd3ce; }
+.spinner { width:38px; height:38px; border:4px solid rgba(255,255,255,.2); border-top-color:var(--yellow); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#gameFrame { width:100%; height:100%; border:0; background:#fff; }
