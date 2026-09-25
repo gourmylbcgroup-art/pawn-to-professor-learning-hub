@@ -1,7 +1,8 @@
-/* Pawn to Professor v1.6.5
-   Trusted-device auto-open fix.
-   Loaded AFTER app.js. After a successful device verification, open the
-   classroom directly instead of running a second login-security round trip. */
+/* Pawn to Professor v1.6.6
+   Trusted-device auto-open display fix.
+   The device was being verified correctly, but the verification view stayed
+   visible while the portal was opened underneath it. Because board-shell uses
+   overflow:hidden, the portal looked stuck until a manual refresh. */
 (() => {
   const form = document.getElementById('deviceVerifyForm');
   if (!form) return;
@@ -46,6 +47,7 @@
       submitButton.disabled = true;
       submitButton.textContent = 'Checking…';
     }
+
     setVisibleStatus('Checking your verification code…');
 
     try {
@@ -83,20 +85,26 @@
       setVisibleStatus('✅ Device verified. Opening your classroom…');
 
       /*
-       * Important v1.6.5 change:
-       * verify-device already saved this exact session + device as trusted.
-       * Running completeMemberLogin() again created a second security round trip
-       * and could leave the UI waiting until a manual refresh.
+       * v1.6.6 critical fix:
+       * enterPortal() hides loading/login/register views, but it does NOT hide
+       * deviceVerifyView. That left this full-height verification page visible
+       * in front of the portal. A browser refresh worked because the verification
+       * view starts hidden on a fresh page load.
        *
-       * Go straight into the portal now. The normal 30-second security monitor
-       * still enforces the one-device rule afterwards.
+       * Hide it BEFORE opening the portal.
        */
-      await enterPortal();
+      hide(els.deviceVerifyView);
 
-      /*
-       * Best-effort cleanup of other Supabase sessions.
-       * Do not await it, because opening the classroom must not depend on this call.
-       */
+      try {
+        await enterPortal();
+      } catch (portalError) {
+        // If portal loading itself fails, restore this view and show the real error.
+        show(els.deviceVerifyView);
+        throw portalError;
+      }
+
+      // Best-effort cleanup of other Supabase sessions.
+      // Do not block portal opening on this background action.
       state.client?.auth?.signOut?.({ scope: 'others' }).catch(() => {});
     } catch (error) {
       setVisibleStatus(
