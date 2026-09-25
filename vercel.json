@@ -2,6 +2,28 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/security/check-device",
+      "destination": "/api/security?action=check-device"
+    },
+    {
+      "source": "/api/security/verify-device",
+      "destination": "/api/security?action=verify-device"
+    },
+    {
+      "source": "/api/security/session-status",
+      "destination": "/api/security?action=session-status"
+    },
+    {
+      "source": "/api/security/request-password-reset",
+      "destination": "/api/security?action=request-password-reset"
+    },
+    {
+      "source": "/api/security/reset-password",
+      "destination": "/api/security?action=reset-password"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

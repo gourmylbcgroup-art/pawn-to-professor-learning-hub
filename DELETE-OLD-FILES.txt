@@ -1,0 +1,19 @@
+DELETE THESE FIVE OLD FILES FROM GITHUB BEFORE/WHEN INSTALLING v1.6.2:
+
+api/security/check-device.js
+api/security/verify-device.js
+api/security/session-status.js
+api/security/request-password-reset.js
+api/security/reset-password.js
+
+Why:
+These five files each become a separate Vercel Function. v1.6.2 replaces all five with ONE file:
+
+api/security.js
+
+Do NOT delete:
+api/_lib/security.js
+api/_lib/email.js
+api/_lib/rate-limit.js
+
+Do NOT delete any Supabase SQL file or database table.
