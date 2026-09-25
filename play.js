@@ -9,6 +9,15 @@ const retryBtn = document.getElementById('retryBtn');
 let loadTimers = [];
 let loadAttempt = 0;
 
+function getDeviceId() {
+  let value = localStorage.getItem('ptp_device_id');
+  if (!value) {
+    value = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}-${Math.random()}`);
+    localStorage.setItem('ptp_device_id', value);
+  }
+  return value;
+}
+
 function clearLoadTimers() {
   loadTimers.forEach(clearTimeout);
   loadTimers = [];
@@ -105,7 +114,7 @@ async function start() {
       method: 'POST',
       headers,
       cache: 'no-store',
-      body: JSON.stringify({ activityId })
+      body: JSON.stringify({ activityId, deviceId: getDeviceId() })
     });
 
     const body = await launchRes.json().catch(() => ({}));

@@ -6,7 +6,7 @@ function cleanUsername(value) {
 }
 
 function validEmail(value) {
-  return !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
 export default async function handler(req, res) {
@@ -40,11 +40,11 @@ export default async function handler(req, res) {
   const username = cleanUsername(req.body?.username);
   const password = String(req.body?.password || '');
   const displayName = String(req.body?.displayName || username).trim();
-  const contactEmail = String(req.body?.contactEmail || '').trim().toLowerCase() || null;
+  const contactEmail = String(req.body?.contactEmail || '').trim().toLowerCase();
 
   if (username.length < 3) return res.status(400).json({ error: 'Username must contain at least 3 valid characters.' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
-  if (!validEmail(contactEmail)) return res.status(400).json({ error: 'Contact email is not valid.' });
+  if (!validEmail(contactEmail)) return res.status(400).json({ error: 'A valid real contact email is required for member device verification.' });
 
   const email = `${username}@portal.local`;
   const { data, error } = await admin.auth.admin.createUser({

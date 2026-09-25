@@ -66,6 +66,29 @@
         </form>
       </section>
 
+      <section id="deviceVerifyView" class="view hidden">
+        <div class="brand compact-brand">
+          <div class="brand-kicker">PAWN TO PROFESSOR</div>
+          <h1>Verify New Device</h1>
+          <p>For member accounts, only one trusted browser/device can be active at a time.</p>
+        </div>
+
+        <form id="deviceVerifyForm" class="login-card device-card">
+          <div class="security-icon">🔐</div>
+          <p id="deviceVerifyMessage" class="device-message">We sent a 6-digit verification code to your registered email.</p>
+          <label>
+            Verification code
+            <input id="deviceVerifyCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required />
+          </label>
+          <div class="button-row">
+            <button id="deviceBackBtn" class="btn btn-ghost" type="button">← Back to login</button>
+            <button class="btn btn-primary" type="submit">Verify Device</button>
+          </div>
+          <button id="deviceResendBtn" class="btn btn-ghost" type="button">Send a new code</button>
+          <p id="deviceVerifyError" class="form-message" role="alert"></p>
+        </form>
+      </section>
+
       <section id="portalView" class="view hidden">
         <header class="board-header">
           <div>

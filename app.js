@@ -18,6 +18,13 @@ const els = {
   registerPassword2: document.getElementById('registerPassword2'),
   registerMessage: document.getElementById('registerMessage'),
   backToLoginBtn: document.getElementById('backToLoginBtn'),
+  deviceVerifyView: document.getElementById('deviceVerifyView'),
+  deviceVerifyForm: document.getElementById('deviceVerifyForm'),
+  deviceVerifyCode: document.getElementById('deviceVerifyCode'),
+  deviceVerifyMessage: document.getElementById('deviceVerifyMessage'),
+  deviceVerifyError: document.getElementById('deviceVerifyError'),
+  deviceBackBtn: document.getElementById('deviceBackBtn'),
+  deviceResendBtn: document.getElementById('deviceResendBtn'),
   loginBrandKicker: document.getElementById('loginBrandKicker'),
   loginPortalTitle: document.getElementById('loginPortalTitle'),
   loginPortalSubtitle: document.getElementById('loginPortalSubtitle'),
@@ -34,6 +41,10 @@ const els = {
 const DEFAULT_SETTINGS = {
   registration_enabled: false,
   community_enabled: false,
+  member_device_security_enabled: false,
+  trusted_device_days: 90,
+  device_code_minutes: 10,
+  email_notifications_enabled: false,
   portal_title: 'Learning Hub',
   portal_subtitle: 'Choose your grade. Open your unit. Start learning.',
   brand_kicker: 'PAWN TO PROFESSOR',
@@ -73,7 +84,9 @@ const state = {
   communityTopicPage: 0,
   communityPostPage: 0,
   adminUserSearch: '',
-  adminUserPage: 0
+  adminUserPage: 0,
+  pendingDeviceChallenge: null,
+  securityMonitor: null
 };
 
 const aliasDomain = 'portal.local';
@@ -119,6 +132,53 @@ function unitPath(unitId) {
   return [year?.name, grade?.name, unit?.name].filter(Boolean).join(' / ');
 }
 
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem('ptp_device_id');
+  if (!id) {
+    id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}-${Math.random()}`;
+    localStorage.setItem('ptp_device_id', id);
+  }
+  return id;
+}
+
+function getDeviceLabel() {
+  const ua = navigator.userAgent || '';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) && !/Chrome\//.test(ua) ? 'Safari' : /Firefox\//.test(ua) ? 'Firefox' : 'Browser';
+  const os = /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS/iPadOS' : /Linux/.test(ua) ? 'Linux' : 'device';
+  return `${browser} on ${os}`;
+}
+
+async function authHeaders() {
+  const { data: { session } } = await state.client.auth.getSession();
+  return { 'Content-Type':'application/json', 'Authorization':`Bearer ${session?.access_token || ''}` };
+}
+
+function stopSecurityMonitor() {
+  if (state.securityMonitor) clearInterval(state.securityMonitor);
+  state.securityMonitor = null;
+}
+
+async function startSecurityMonitor() {
+  stopSecurityMonitor();
+  if (isStaff() || !state.settings.member_device_security_enabled) return;
+  const check = async () => {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/security/session-status', {
+        method:'POST', headers, cache:'no-store',
+        body:JSON.stringify({ deviceId:getOrCreateDeviceId() })
+      });
+      if (res.ok) return;
+      const body = await res.json().catch(()=>({}));
+      stopSecurityMonitor();
+      await state.client.auth.signOut({ scope:'local' });
+      Object.assign(state,{session:null,profile:null,view:'years'});
+      showLogin(body.error || 'This account is now active on another device. Please sign in again.');
+    } catch { /* temporary network problems must not kick a teacher out */ }
+  };
+  state.securityMonitor = setInterval(check, 30000);
+}
+
 async function boot() {
   try {
     const res = await fetch('/api/config');
@@ -133,7 +193,7 @@ async function boot() {
     state.session = data.session;
     state.client.auth.onAuthStateChange((_event, session) => { state.session = session; });
 
-    if (state.session) await enterPortal();
+    if (state.session) await completeMemberLogin();
     else showLogin();
   } catch (err) {
     hide(els.loading);
@@ -172,19 +232,83 @@ function applyDesign(settings) {
 }
 
 function showLogin(message = '') {
-  hide(els.loading); hide(els.portalView); hide(els.registerView); show(els.loginView);
+  stopSecurityMonitor();
+  hide(els.loading); hide(els.portalView); hide(els.registerView); hide(els.deviceVerifyView); show(els.loginView);
   els.loginMessage.textContent = message;
   state.settings.registration_enabled ? show(els.openRegisterBtn) : hide(els.openRegisterBtn);
   els.loginUsername.focus();
 }
 function showRegister() {
-  hide(els.loginView); hide(els.portalView); show(els.registerView);
+  hide(els.loginView); hide(els.portalView); hide(els.deviceVerifyView); show(els.registerView);
   els.registerMessage.textContent = '';
   els.registerUsername.focus();
 }
 
+function showDeviceVerification(challenge) {
+  hide(els.loading); hide(els.loginView); hide(els.registerView); hide(els.portalView); show(els.deviceVerifyView);
+  state.pendingDeviceChallenge = challenge;
+  els.deviceVerifyCode.value = '';
+  els.deviceVerifyError.textContent = '';
+  els.deviceVerifyMessage.textContent = `We sent a 6-digit verification code to ${challenge.maskedEmail || 'your registered email'}. Verifying this device will revoke the previously trusted device.`;
+  els.deviceVerifyCode.focus();
+}
+
+async function completeMemberLogin({ resend = false } = {}) {
+  if (!state.session) return showLogin();
+  try {
+    const headers = await authHeaders();
+    const res = await fetch('/api/security/check-device', {
+      method:'POST', headers, cache:'no-store',
+      body:JSON.stringify({ deviceId:getOrCreateDeviceId(), deviceLabel:getDeviceLabel(), resend })
+    });
+    const body = await res.json().catch(()=>({}));
+    if (!res.ok) {
+      await state.client.auth.signOut({ scope:'local' });
+      state.session = null;
+      return showLogin(body.error || 'Security verification could not be completed.');
+    }
+    if (body.challengeRequired) {
+      showDeviceVerification({ id:body.challengeId, maskedEmail:body.maskedEmail, expiresAt:body.expiresAt });
+      return;
+    }
+    if (body.allowed) {
+      if (!body.exempt) await state.client.auth.signOut({ scope:'others' }).catch(()=>{});
+      await enterPortal();
+    }
+  } catch (err) {
+    await state.client.auth.signOut({ scope:'local' }).catch(()=>{});
+    state.session = null;
+    showLogin(err.message || 'Could not complete login security check.');
+  }
+}
+
 els.openRegisterBtn.addEventListener('click', showRegister);
 els.backToLoginBtn.addEventListener('click', () => showLogin());
+els.deviceBackBtn.addEventListener('click', async () => {
+  await state.client.auth.signOut({ scope:'local' }).catch(()=>{});
+  state.session = null; state.pendingDeviceChallenge = null; showLogin();
+});
+els.deviceResendBtn.addEventListener('click', async () => {
+  els.deviceVerifyError.textContent = 'Sending a new code…';
+  await completeMemberLogin({ resend:true });
+  if (state.pendingDeviceChallenge) els.deviceVerifyError.textContent = '';
+});
+els.deviceVerifyForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!state.pendingDeviceChallenge?.id) return showLogin('Please sign in again.');
+  els.deviceVerifyError.textContent = 'Checking code…';
+  const headers = await authHeaders();
+  const res = await fetch('/api/security/verify-device', {
+    method:'POST', headers, cache:'no-store',
+    body:JSON.stringify({ challengeId:state.pendingDeviceChallenge.id, code:els.deviceVerifyCode.value.trim(), deviceId:getOrCreateDeviceId(), deviceLabel:getDeviceLabel() })
+  });
+  const body = await res.json().catch(()=>({}));
+  if (!res.ok) { els.deviceVerifyError.textContent = body.error || 'Verification failed.'; return; }
+  state.pendingDeviceChallenge = null;
+  els.deviceVerifyError.textContent = '';
+  await state.client.auth.signOut({ scope:'others' }).catch(()=>{});
+  await enterPortal();
+});
 
 els.registerForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -224,16 +348,17 @@ els.loginForm.addEventListener('submit', async (e) => {
   }
   state.session = data.session;
   els.loginMessage.textContent = '';
-  await enterPortal();
+  await completeMemberLogin();
 });
 
 els.logoutBtn.addEventListener('click', async () => {
-  await state.client.auth.signOut();
+  stopSecurityMonitor();
+  await state.client.auth.signOut({ scope:'local' });
   Object.assign(state, {
     session:null, profile:null, view:'years', year:null, grade:null, unit:null,
     selectedAdminUser:null, adminUsers:[], packages:[], accessGroups:[], selectedAccessGroup:null,
     communityCategory:null, communityTopic:null, communityTopicPage:0, communityPostPage:0,
-    adminUserSearch:'', adminUserPage:0, tools:[]
+    adminUserSearch:'', adminUserPage:0, tools:[], pendingDeviceChallenge:null
   });
   await loadPublicSettings();
   showLogin();
@@ -283,6 +408,7 @@ async function enterPortal() {
   state.view = 'years';
   show(els.portalView);
   render();
+  await startSecurityMonitor();
 }
 
 async function loadStructure() {
@@ -406,32 +532,79 @@ function renderUnits() {
   else els.content.appendChild(grid);
 }
 
+async function openResourceSecure(resourceId, mode = 'view') {
+  const popup = window.open('about:blank','_blank');
+  if (popup) popup.document.write('<p style="font-family:system-ui;padding:2rem">Checking access…</p>');
+  try {
+    const headers = await authHeaders();
+    const res = await fetch('/api/resource/resolve', {
+      method:'POST', headers, cache:'no-store',
+      body:JSON.stringify({ resourceId, mode, deviceId:getOrCreateDeviceId() })
+    });
+    const body = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error(body.error || 'Resource access was denied.');
+    if (popup) popup.location.replace(body.url); else window.location.assign(body.url);
+  } catch (err) {
+    if (popup) popup.close();
+    toast(err.message || 'Could not open resource.');
+  }
+}
+
 async function renderActivities() {
   setHeader(state.unit.name, [state.year.name, state.grade.name, state.unit.name]);
-  els.content.innerHTML = '<div class="empty-state">Loading activities…</div>';
-  // Deliberately do NOT request launch_url. v1.3 keeps the real destination server-side.
-  const { data, error } = await state.client.from('activities')
-    .select('id,unit_id,title,type,thumbnail_url,sort_order,published')
-    .eq('unit_id', state.unit.id).eq('published', true).order('sort_order');
+  els.content.innerHTML = '<div class="empty-state">Loading Unit content…</div>';
+  const [activityResult, resourceResult] = await Promise.all([
+    state.client.from('activities')
+      .select('id,unit_id,title,type,thumbnail_url,sort_order,published')
+      .eq('unit_id', state.unit.id).eq('published', true).order('sort_order'),
+    state.client.from('resources')
+      .select('id,unit_id,title,resource_type,description,audience,allow_view,allow_download,published,sort_order')
+      .eq('unit_id', state.unit.id).eq('published', true).order('sort_order')
+  ]);
   if (state.view !== 'activities') return;
   els.content.innerHTML = '';
+  const error = activityResult.error || resourceResult.error;
   if (error) { els.content.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; return; }
-  if (!data?.length) { els.content.innerHTML = '<div class="empty-state"><div><strong>This unit is ready.</strong><br>No games have been added yet.</div></div>'; return; }
-  const list = document.createElement('div'); list.className = 'activity-list';
-  data.forEach(a => {
-    const card = document.createElement('article'); card.className='activity-card';
-    card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')} · Secure launch</p>`;
-    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='PLAY 🔐';
-    btn.addEventListener('click',()=>window.open(`/play.html?activity=${encodeURIComponent(a.id)}`,'_blank','noopener,noreferrer'));
-    card.appendChild(btn);
-    if (state.settings.community_enabled) {
-      const discuss=document.createElement('button'); discuss.className='btn btn-ghost btn-small'; discuss.textContent='Discuss 💬';
-      discuss.addEventListener('click',()=>{state.view='community';state.communityCategory=null;state.communityTopic=null;render();});
-      card.appendChild(discuss);
-    }
-    list.appendChild(card);
-  });
-  els.content.appendChild(list);
+  const activities = activityResult.data || [];
+  const resources = resourceResult.data || [];
+  if (!activities.length && !resources.length) {
+    els.content.innerHTML = '<div class="empty-state"><div><strong>This unit is ready.</strong><br>No games or resources have been added yet.</div></div>';
+    return;
+  }
+
+  if (activities.length) {
+    const heading=document.createElement('h2'); heading.className='section-heading'; heading.textContent='🎮 Games & Activities'; els.content.appendChild(heading);
+    const list = document.createElement('div'); list.className = 'activity-list';
+    activities.forEach(a => {
+      const card = document.createElement('article'); card.className='activity-card';
+      card.innerHTML = `<h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.type || 'Activity')} · Secure launch</p>`;
+      const btn = document.createElement('button'); btn.className='btn'; btn.textContent='PLAY 🔐';
+      btn.addEventListener('click',()=>window.open(`/play.html?activity=${encodeURIComponent(a.id)}`,'_blank','noopener,noreferrer'));
+      card.appendChild(btn);
+      if (state.settings.community_enabled) {
+        const discuss=document.createElement('button'); discuss.className='btn btn-ghost btn-small'; discuss.textContent='Discuss 💬';
+        discuss.addEventListener('click',()=>{state.view='community';state.communityCategory=null;state.communityTopic=null;render();});
+        card.appendChild(discuss);
+      }
+      list.appendChild(card);
+    });
+    els.content.appendChild(list);
+  }
+
+  if (resources.length) {
+    const heading=document.createElement('h2'); heading.className='section-heading resource-heading'; heading.textContent='📁 Resources'; els.content.appendChild(heading);
+    const list=document.createElement('div'); list.className='resource-list';
+    resources.forEach(r=>{
+      const icon = r.resource_type === 'Audio' ? '🎧' : r.resource_type === 'ZIP' ? '📦' : r.resource_type === 'Flashcards' ? '🃏' : r.resource_type === 'Worksheet' ? '📝' : r.resource_type === 'Teacher Guide' ? '📘' : '📄';
+      const card=document.createElement('article'); card.className='resource-card';
+      card.innerHTML=`<div class="resource-icon">${icon}</div><div class="resource-body"><h3>${escapeHtml(r.title)}</h3><p>${escapeHtml(r.description||r.resource_type||'Resource')}</p><div class="resource-actions"></div></div>`;
+      const actions=card.querySelector('.resource-actions');
+      if(r.allow_view){const b=document.createElement('button');b.className='btn btn-small';b.textContent='OPEN';b.addEventListener('click',()=>openResourceSecure(r.id,'view'));actions.appendChild(b);}
+      if(r.allow_download){const b=document.createElement('button');b.className='btn btn-small btn-ghost';b.textContent='DOWNLOAD';b.addEventListener('click',()=>openResourceSecure(r.id,'download'));actions.appendChild(b);}
+      list.appendChild(card);
+    });
+    els.content.appendChild(list);
+  }
 }
 
 function renderTools() {
@@ -485,6 +658,21 @@ async function logAudit(action, entityType = null, entityId = null, details = {}
   } catch { /* audit logging must never block the main action */ }
 }
 
+async function notifyContent(contentType, contentId) {
+  try {
+    const headers = await authHeaders();
+    const res = await fetch('/api/admin/notify-content', {
+      method:'POST', headers, cache:'no-store',
+      body:JSON.stringify({ contentType, contentId })
+    });
+    const body = await res.json().catch(()=>({}));
+    if (!res.ok) return toast(body.error || 'Content was published, but email notification failed.');
+    toast(`Notification email: ${body.sent || 0} sent${body.failed ? `, ${body.failed} failed` : ''}.`);
+  } catch (err) {
+    toast(`Content published. Email notification failed: ${err.message || 'unknown error'}`);
+  }
+}
+
 function renderAdmin() {
   setHeader(isOwner() ? 'Owner Administration' : 'Administrator', ['Admin']);
   const pendingCount = state.adminUsers.filter(u => u.status === 'pending').length;
@@ -495,6 +683,7 @@ function renderAdmin() {
     ['groups','👥 Access Groups'],
     ['packages','🎟 Access Packages'],
     ['content','🎮 Activities'],
+    ['resources','📁 Resources'],
     ['structure','📚 Content Structure'],
     ['tools','🧰 Teacher Tools'],
     ['communityAdmin','💬 Community'],
@@ -522,6 +711,7 @@ function renderAdmin() {
   if (state.adminTab === 'groups') renderAdminGroups(panel);
   if (state.adminTab === 'packages') renderAdminPackages(panel);
   if (state.adminTab === 'content') renderAdminContent(panel);
+  if (state.adminTab === 'resources') renderAdminResources(panel);
   if (state.adminTab === 'structure') renderAdminStructure(panel);
   if (state.adminTab === 'tools') renderAdminTools(panel);
   if (state.adminTab === 'communityAdmin') renderAdminCommunity(panel);
@@ -563,8 +753,8 @@ async function renderAdminDashboard(panel) {
 }
 
 async function exportAdminBackup() {
-  const tables = ['profiles','school_years','grades','units','activities','user_unit_access','access_packages','access_package_units','access_groups','access_group_members','access_group_rules','external_tools','portal_settings','forum_categories','forum_topics','forum_posts'];
-  const backup = { exported_at:new Date().toISOString(), version:'1.5', data:{} };
+  const tables = ['profiles','school_years','grades','units','activities','resources','resource_targets','user_unit_access','access_packages','access_package_units','access_groups','access_group_members','access_group_rules','external_tools','portal_settings','member_security','forum_categories','forum_topics','forum_posts','email_notification_log'];
+  const backup = { exported_at:new Date().toISOString(), version:'1.6', data:{} };
   for (const table of tables) {
     const { data, error } = await state.client.from(table).select('*');
     backup.data[table] = error ? { error:error.message } : data;
@@ -670,10 +860,11 @@ async function createUserFromAdmin() {
 
 async function renderAdminUserPermissions(container, user) {
   container.innerHTML='<p class="admin-note">Loading access…</p>';
-  const [{ data: access, error }, { data: packageUnits }, { data: memberships }] = await Promise.all([
+  const [{ data: access, error }, { data: packageUnits }, { data: memberships }, { data: memberSecurity }] = await Promise.all([
     state.client.from('user_unit_access').select('*').eq('user_id', user.id),
     state.client.from('access_package_units').select('*'),
-    state.client.from('access_group_members').select('group_id').eq('user_id', user.id)
+    state.client.from('access_group_members').select('group_id').eq('user_id', user.id),
+    state.client.from('member_security').select('*').eq('user_id', user.id).maybeSingle()
   ]);
   if (error) { container.textContent=error.message; return; }
   const checked = new Set((access||[]).map(a=>a.unit_id));
@@ -694,9 +885,10 @@ async function renderAdminUserPermissions(container, user) {
     </div>
     ${!isOwner()?'<p class="admin-note">Only the Owner can promote or demote administrators.</p>':''}
     ${isTargetStaff ? `
-      <div class="full-access-card"><strong>✅ FULL PORTAL ACCESS</strong><p>Admin and Owner accounts automatically have access to every current and future Year, Grade, Unit and Game. No Unit checkboxes are required.</p></div>
+      <div class="full-access-card"><strong>✅ FULL PORTAL ACCESS</strong><p>Admin and Owner accounts automatically have access to every current and future Year, Grade, Unit and Game. They are exempt from trusted-device verification.</p></div>
       <button id="savePermissions" class="btn btn-accent" type="button">Save Profile</button>
     ` : `
+      <div class="security-admin-card"><strong>🔐 Trusted Device Security</strong><p class="admin-note">${memberSecurity?.trusted_device_hash ? `Trusted: ${escapeHtml(memberSecurity.trusted_device_label || 'Browser')} · until ${shortDate(memberSecurity.trusted_until)}` : 'No trusted device yet. The next login will require email verification.'}</p><button id="resetTrustedDevice" class="btn btn-small btn-ghost">Reset Trusted Device</button></div>
       <div class="group-summary"><strong>Dynamic Access Groups</strong><p class="admin-note">${memberGroups.length ? memberGroups.map(g=>escapeHtml(g.name)).join(' · ') : 'No Access Group assigned.'}</p></div>
       <div class="admin-form-grid" style="margin-top:.55em">
         <label>Apply access package<select id="packageSelect"><option value="">Choose package…</option>${state.packages.filter(p=>p.active).map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></label>
@@ -708,6 +900,14 @@ async function renderAdminUserPermissions(container, user) {
   if (user.expires_at) container.querySelector('#userExpiry').value = new Date(user.expires_at).toISOString().slice(0,10);
 
   if (!isTargetStaff) {
+    container.querySelector('#resetTrustedDevice').addEventListener('click',async()=>{
+      if(!confirm(`Reset trusted device for ${user.username}? Their next login will require an email verification code.`))return;
+      const headers=await authHeaders();
+      const res=await fetch('/api/admin/reset-device',{method:'POST',headers,body:JSON.stringify({userId:user.id})});
+      const body=await res.json().catch(()=>({}));
+      if(!res.ok)return toast(body.error||'Could not reset trusted device.');
+      toast('Trusted device reset.');renderAdminUserPermissions(container,user);
+    });
     const matrix=container.querySelector('#permissionMatrix');
     state.years.forEach(year=>{
       const y=document.createElement('div'); y.className='permission-group'; y.innerHTML=`<strong>${escapeHtml(year.name)}</strong>`;
@@ -839,6 +1039,7 @@ function renderAdminContent(panel) {
       <label class="wide">Real Game URL <span class="field-help">(Admin only)</span><input id="activityUrl" type="url" placeholder="https://your-game.vercel.app"></label>
       <label>Direct Game Gate<select id="activityGate"><option value="false">Not installed / unsure</option><option value="true">Installed</option></select></label>
       <label>Security note<input id="activitySecurityNote" placeholder="Private GitHub repo, gate checked..."></label>
+      <label class="checkbox-card"><input id="activityNotify" type="checkbox"> Email members who can access this Unit</label>
       <div class="wide"><button id="addActivity" class="btn btn-accent">+ Publish Secure Activity</button></div>
     </div><hr class="soft"><h3>Existing activities</h3><div id="activityManageList" class="manage-list"></div>`;
   const yearSel=panel.querySelector('#activityYear'), gradeSel=panel.querySelector('#activityGrade'), unitSel=panel.querySelector('#activityUnit');
@@ -857,7 +1058,9 @@ function renderAdminContent(panel) {
     const {error:targetError}=await state.client.from('activity_targets').insert(target);
     if(targetError){ await state.client.from('activities').delete().eq('id',data.id); return toast(targetError.message); }
     await logAudit('secure_activity_created','activity',data.id,{title:row.title,unit_id:row.unit_id,security_mode:target.security_mode});
+    const shouldNotify = panel.querySelector('#activityNotify')?.checked;
     toast('Secure activity published.'); panel.querySelector('#activityTitle').value=''; panel.querySelector('#activityUrl').value=''; loadManagedActivities(panel);
+    if (shouldNotify) notifyContent('activity', data.id);
   });
 }
 
@@ -875,7 +1078,7 @@ async function loadManagedActivities(panel) {
     const mode=target?.security_mode||'not configured';
     const card=document.createElement('div'); card.className='manage-card';
     const gateStatus=target?.gate_installed?'🟢 Game Gate':'🟡 Gate not confirmed';
-    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)} · ${gateStatus}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-gate>${target?.gate_installed?'Mark Gate Missing':'Mark Gate Installed'}</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)} · ${gateStatus}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-notify>Email Members</button><button class="btn btn-small btn-ghost" data-gate>${target?.gate_installed?'Mark Gate Missing':'Mark Gate Installed'}</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
     card.querySelector('[data-edit]').addEventListener('click',async()=>{
       const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
       const url=prompt('Real game URL (Admin only)',target?.target_url||''); if(url===null||!url.trim())return;
@@ -887,6 +1090,7 @@ async function loadManagedActivities(panel) {
       if(tErr)return toast(tErr.message);
       await logAudit('secure_activity_updated','activity',a.id,{title:title.trim(),security_mode:modeInput});toast('Activity updated.');loadManagedActivities(panel);
     });
+    card.querySelector('[data-notify]').addEventListener('click',()=>{if(confirm(`Email entitled members about ${a.title}?`))notifyContent('activity',a.id);});
     card.querySelector('[data-gate]').addEventListener('click',async()=>{
       if(!target)return toast('Secure target is not configured.');
       const next=!target.gate_installed;
@@ -911,6 +1115,74 @@ async function loadManagedActivities(panel) {
   });
 }
 
+function renderAdminResources(panel) {
+  const {yearOptions}=buildHierarchyOptions();
+  panel.innerHTML=`
+    <h2>Resources</h2>
+    <p class="admin-note">Paste an iCloud share link for PDFs, flashcards, worksheets, audio or ZIP files. Members only see the OPEN/DOWNLOAD button after the Learning Hub checks their Unit access. The underlying iCloud link can still be copied after it opens.</p>
+    <div class="admin-form-grid">
+      <label>Year<select id="resourceYear">${yearOptions}</select></label><label>Grade<select id="resourceGrade"></select></label>
+      <label>Unit<select id="resourceUnit"></select></label>
+      <label>Type<select id="resourceType"><option>PDF</option><option>Flashcards</option><option>Worksheet</option><option>Teacher Guide</option><option>Audio</option><option>ZIP</option><option>Other</option></select></label>
+      <label class="wide">Title<input id="resourceTitle" placeholder="Numbers 1–10 Flashcards"></label>
+      <label class="wide">Description<input id="resourceDescription" placeholder="Optional description"></label>
+      <label class="wide">iCloud / file share link <span class="field-help">(Admin only)</span><input id="resourceUrl" type="url" placeholder="https://www.icloud.com/iclouddrive/..."></label>
+      <label>Audience<select id="resourceAudience"><option value="unit">Members with Unit access</option><option value="staff">Admin/Owner only</option></select></label>
+      <label class="checkbox-card"><input id="resourceView" type="checkbox" checked> Allow Open/View</label>
+      <label class="checkbox-card"><input id="resourceDownload" type="checkbox" checked> Allow Download</label>
+      <label class="checkbox-card"><input id="resourceNotify" type="checkbox"> Email members who can access this Unit</label>
+      <div class="wide"><button id="addResource" class="btn btn-accent">+ Publish Resource</button></div>
+    </div>
+    <hr class="soft"><h3>Existing resources</h3><div id="resourceManageList" class="manage-list"></div>`;
+
+  const yearSel=panel.querySelector('#resourceYear'),gradeSel=panel.querySelector('#resourceGrade'),unitSel=panel.querySelector('#resourceUnit');
+  const refreshUnits=()=>{const units=state.units.filter(u=>u.grade_id===gradeSel.value);unitSel.innerHTML=units.map(u=>`<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');loadManagedResources(panel);};
+  const refreshGrades=()=>{const grades=state.grades.filter(g=>g.school_year_id===yearSel.value);gradeSel.innerHTML=grades.map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');refreshUnits();};
+  yearSel.addEventListener('change',refreshGrades);gradeSel.addEventListener('change',refreshUnits);unitSel.addEventListener('change',()=>loadManagedResources(panel));refreshGrades();
+
+  panel.querySelector('#addResource').addEventListener('click',async()=>{
+    const unit_id=unitSel.value;
+    const title=panel.querySelector('#resourceTitle').value.trim();
+    const url=panel.querySelector('#resourceUrl').value.trim();
+    if(!unit_id||!title||!url)return toast('Choose a Unit and add a title and file link.');
+    try{new URL(url);}catch{return toast('The file link is not valid.');}
+    const row={unit_id,title,resource_type:panel.querySelector('#resourceType').value,description:panel.querySelector('#resourceDescription').value.trim()||null,audience:panel.querySelector('#resourceAudience').value,allow_view:panel.querySelector('#resourceView').checked,allow_download:panel.querySelector('#resourceDownload').checked,published:true,sort_order:10,created_by:state.session.user.id};
+    const {data,error}=await state.client.from('resources').insert(row).select().single();if(error)return toast(error.message);
+    const {error:tErr}=await state.client.from('resource_targets').insert({resource_id:data.id,target_url:url,enabled:true});
+    if(tErr){await state.client.from('resources').delete().eq('id',data.id);return toast(tErr.message);}
+    await logAudit('resource_created','resource',data.id,{title,unit_id,type:row.resource_type});
+    const shouldNotify=panel.querySelector('#resourceNotify').checked && row.audience==='unit';
+    toast('Resource published.');
+    panel.querySelector('#resourceTitle').value='';panel.querySelector('#resourceDescription').value='';panel.querySelector('#resourceUrl').value='';
+    loadManagedResources(panel);
+    if(shouldNotify)notifyContent('resource',data.id);
+  });
+}
+
+async function loadManagedResources(panel){
+  const unitId=panel.querySelector('#resourceUnit')?.value;const list=panel.querySelector('#resourceManageList');if(!unitId||!list)return;
+  list.innerHTML='Loading…';
+  const {data,error}=await state.client.from('resources').select('*').eq('unit_id',unitId).order('sort_order');if(error){list.textContent=error.message;return;}
+  list.innerHTML='';if(!data?.length){list.innerHTML='<p class="admin-note">No resources in this Unit yet.</p>';return;}
+  const ids=data.map(r=>r.id);const {data:targets}=await state.client.from('resource_targets').select('*').in('resource_id',ids);const targetMap=new Map((targets||[]).map(t=>[t.resource_id,t]));
+  data.forEach(r=>{
+    const target=targetMap.get(r.id);const card=document.createElement('div');card.className='manage-card';
+    card.innerHTML=`<div><strong>${escapeHtml(r.title)}</strong><div class="meta">${escapeHtml(r.resource_type)} · ${r.audience==='staff'?'Staff only':'Unit members'} · ${r.published?'Published':'Hidden'} · ${r.allow_download?'Download allowed':'View only'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-notify>Email Members</button><button class="btn btn-small btn-ghost" data-toggle>${r.published?'Hide':'Show'}</button><button class="btn btn-small btn-danger" data-delete>Delete</button></div>`;
+    card.querySelector('[data-edit]').addEventListener('click',async()=>{
+      const title=prompt('Resource title',r.title);if(title===null||!title.trim())return;
+      const url=prompt('iCloud / file link (Admin only)',target?.target_url||'');if(url===null||!url.trim())return;try{new URL(url.trim());}catch{return toast('The file link is not valid.');}
+      const description=prompt('Description',r.description||'');if(description===null)return;
+      const {error:e}=await state.client.from('resources').update({title:title.trim(),description:description.trim()||null}).eq('id',r.id);if(e)return toast(e.message);
+      const {error:te}=await state.client.from('resource_targets').upsert({resource_id:r.id,target_url:url.trim(),enabled:true},{onConflict:'resource_id'});if(te)return toast(te.message);
+      await logAudit('resource_updated','resource',r.id,{title:title.trim()});toast('Resource updated.');loadManagedResources(panel);
+    });
+    card.querySelector('[data-notify]').addEventListener('click',()=>{if(r.audience==='staff')return toast('Staff-only resources are not emailed to members.');if(confirm(`Email entitled members about ${r.title}?`))notifyContent('resource',r.id);});
+    card.querySelector('[data-toggle]').addEventListener('click',async()=>{const {error:e}=await state.client.from('resources').update({published:!r.published}).eq('id',r.id);if(e)return toast(e.message);await logAudit('resource_visibility_changed','resource',r.id,{published:!r.published});toast(r.published?'Resource hidden.':'Resource published.');loadManagedResources(panel);});
+    card.querySelector('[data-delete]').addEventListener('click',async()=>{if(!confirm(`Permanently delete ${r.title}?`))return;const {error:e}=await state.client.from('resources').delete().eq('id',r.id);if(e)return toast(e.message);await logAudit('resource_deleted','resource',r.id,{title:r.title});toast('Resource deleted.');loadManagedResources(panel);});
+    list.appendChild(card);
+  });
+}
+
 function renderAdminStructure(panel) {
   const {yearOptions}=buildHierarchyOptions();
   panel.innerHTML=`
@@ -919,7 +1191,7 @@ function renderAdminStructure(panel) {
     <hr class="soft">
     <div class="admin-form-grid"><label>Year<select id="structureYear">${yearOptions}</select></label><label>New grade<input id="newGrade" placeholder="Grade 3"></label><div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div></div>
     <hr class="soft">
-    <div class="admin-form-grid"><label>Year<select id="unitYear">${yearOptions}</select></label><label>Grade<select id="unitGrade"></select></label><label>Unit name<input id="newUnitName" placeholder="Unit 3"></label><label>Unit title<input id="newUnitTitle" placeholder="At School"></label><div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div></div>
+    <div class="admin-form-grid"><label>Year<select id="unitYear">${yearOptions}</select></label><label>Grade<select id="unitGrade"></select></label><label>Unit name<input id="newUnitName" placeholder="Unit 3"></label><label>Unit title<input id="newUnitTitle" placeholder="At School"></label><label class="checkbox-card"><input id="unitNotify" type="checkbox"> Email members who automatically receive this Unit</label><div class="wide"><button id="addUnit" class="btn btn-accent">+ Unit</button></div></div>
     <div class="admin-form-grid" style="margin-top:.55em"><label>Create units from<input id="bulkFrom" type="number" min="1" value="1"></label><label>to<input id="bulkTo" type="number" min="1" value="10"></label><div class="wide"><button id="bulkUnits" class="btn btn-ghost">Bulk Create Units</button></div></div>
     <hr class="soft"><h3>Current structure</h3><div id="structureTree" class="structure-tree"></div>
     <hr class="soft"><h3>Archived / Hidden</h3><div id="archivedTree" class="manage-list">Loading…</div>`;
@@ -928,7 +1200,7 @@ function renderAdminStructure(panel) {
   unitYear.addEventListener('change',fillUnitGrades); fillUnitGrades();
   panel.querySelector('#addYear').addEventListener('click',async()=>{ const name=panel.querySelector('#newYear').value.trim(); if(!name)return; const {data,error}=await state.client.from('school_years').insert({name,sort_order:Number(name)||9999,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('year_created','year',data.id,{name});await adminStructureRefresh('Year added.');} });
   panel.querySelector('#addGrade').addEventListener('click',async()=>{ const name=panel.querySelector('#newGrade').value.trim(),school_year_id=panel.querySelector('#structureYear').value; if(!name||!school_year_id)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {data,error}=await state.client.from('grades').insert({school_year_id,name,sort_order:order,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('grade_created','grade',data.id,{name});await adminStructureRefresh('Grade added.');} });
-  panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {data,error}=await state.client.from('units').insert({grade_id,name,title:title||null,sort_order:order,is_published:true}).select().single(); if(error)toast(error.message);else{await logAudit('unit_created','unit',data.id,{name,grade_id});await adminStructureRefresh('Unit added.');} });
+  panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const shouldNotify=panel.querySelector('#unitNotify')?.checked; const {data,error}=await state.client.from('units').insert({grade_id,name,title:title||null,sort_order:order,is_published:true}).select().single(); if(error)toast(error.message);else{await logAudit('unit_created','unit',data.id,{name,grade_id});await adminStructureRefresh('Unit added.');if(shouldNotify)notifyContent('unit',data.id);} });
   panel.querySelector('#bulkUnits').addEventListener('click',async()=>{
     const grade_id=unitGrade.value, from=Number(panel.querySelector('#bulkFrom').value), to=Number(panel.querySelector('#bulkTo').value);
     if(!grade_id||!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to-from>50)return toast('Choose a grade and a valid range of up to 50 units.');
@@ -1144,16 +1416,23 @@ function renderAdminSettings(panel) {
     <h2>Settings</h2>
     <div class="settings-card"><div class="toggle-line"><div><strong>Public Registration</strong><p class="admin-note">OFF: only Admin/Owner can create users.<br>ON: visitors can request an account, but every new account remains Pending until approved.</p></div><label class="switch"><input id="registrationToggle" type="checkbox" ${state.settings.registration_enabled?'checked':''}><span class="slider"></span></label></div></div>
     <div class="settings-card" style="margin-top:.65em"><div class="toggle-line"><div><strong>Community Forum</strong><p class="admin-note">Enable announcements, help, teaching ideas, game feedback and Grade/Unit discussions.</p></div><label class="switch"><input id="communityToggle" type="checkbox" ${state.settings.community_enabled?'checked':''}><span class="slider"></span></label></div></div>
+    <div class="settings-card" style="margin-top:.65em"><div class="toggle-line"><div><strong>Member Trusted-Device Security</strong><p class="admin-note">Normal members may have one trusted browser/device at a time. A new device requires an email code and replaces the previous device. Admin/Owner are exempt.</p></div><label class="switch"><input id="deviceSecurityToggle" type="checkbox" ${state.settings.member_device_security_enabled?'checked':''}><span class="slider"></span></label></div><div class="admin-form-grid" style="margin-top:.55em"><label>Trust period (days)<input id="trustedDays" type="number" min="1" max="365" value="${Number(state.settings.trusted_device_days||90)}"></label><label>Email code expires (minutes)<input id="codeMinutes" type="number" min="5" max="30" value="${Number(state.settings.device_code_minutes||10)}"></label><div class="wide"><button id="saveSecurityTiming" class="btn btn-small btn-ghost">Save Security Timing</button></div></div></div>
+    <div class="settings-card" style="margin-top:.65em"><div class="toggle-line"><div><strong>New Content Email Notifications</strong><p class="admin-note">When enabled, Admin can tick “Email members” while publishing a Game, Unit or Resource. Only entitled normal members are emailed.</p></div><label class="switch"><input id="emailNotificationsToggle" type="checkbox" ${state.settings.email_notifications_enabled?'checked':''}><span class="slider"></span></label></div></div>
     <p class="admin-note" style="margin-top:.7em">Approved users receive no direct Unit access automatically unless you assign them to an Access Group or grant individual Units.</p>`;
-  panel.querySelector('#registrationToggle').addEventListener('change',async(e)=>{
-    const value=e.target.checked;
-    const {error}=await state.client.from('portal_settings').update({registration_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
-    if(error){e.target.checked=!value;return toast(error.message);} state.settings.registration_enabled=value;await logAudit('registration_toggled','portal_settings','1',{enabled:value});toast(`Public registration ${value?'enabled':'disabled'}.`);
-  });
-  panel.querySelector('#communityToggle').addEventListener('change',async(e)=>{
-    const value=e.target.checked;
-    const {error}=await state.client.from('portal_settings').update({community_enabled:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
-    if(error){e.target.checked=!value;return toast(error.message);} state.settings.community_enabled=value;await logAudit('community_toggled','portal_settings','1',{enabled:value});toast(`Community ${value?'enabled':'disabled'}.`);
+
+  async function saveToggle(field,value,input,label){
+    const {error}=await state.client.from('portal_settings').update({[field]:value,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
+    if(error){input.checked=!value;return toast(error.message);}state.settings[field]=value;await logAudit(`${field}_toggled`,'portal_settings','1',{enabled:value});toast(`${label} ${value?'enabled':'disabled'}.`);
+  }
+  panel.querySelector('#registrationToggle').addEventListener('change',e=>saveToggle('registration_enabled',e.target.checked,e.target,'Public registration'));
+  panel.querySelector('#communityToggle').addEventListener('change',e=>saveToggle('community_enabled',e.target.checked,e.target,'Community'));
+  panel.querySelector('#deviceSecurityToggle').addEventListener('change',e=>saveToggle('member_device_security_enabled',e.target.checked,e.target,'Member device security'));
+  panel.querySelector('#emailNotificationsToggle').addEventListener('change',e=>saveToggle('email_notifications_enabled',e.target.checked,e.target,'Email notifications'));
+  panel.querySelector('#saveSecurityTiming').addEventListener('click',async()=>{
+    const trusted_device_days=Math.min(365,Math.max(1,Number(panel.querySelector('#trustedDays').value)||90));
+    const device_code_minutes=Math.min(30,Math.max(5,Number(panel.querySelector('#codeMinutes').value)||10));
+    const {error}=await state.client.from('portal_settings').update({trusted_device_days,device_code_minutes,updated_at:new Date().toISOString(),updated_by:state.session.user.id}).eq('id',1);
+    if(error)return toast(error.message);Object.assign(state.settings,{trusted_device_days,device_code_minutes});await logAudit('security_timing_updated','portal_settings','1',{trusted_device_days,device_code_minutes});toast('Security timing saved.');
   });
 }
 
@@ -1183,6 +1462,8 @@ async function renderAdminHealth(panel) {
         <div class="dashboard-card ${dbClass}"><strong>${Number(body.databaseLatencyMs || 0)} ms</strong><span>Database check</span></div>
         <div class="dashboard-card"><strong>${Number(body.counts?.profiles || 0)}</strong><span>Accounts</span></div>
         <div class="dashboard-card"><strong>${Number(body.counts?.activities || 0)}</strong><span>Activities</span></div>
+        <div class="dashboard-card"><strong>${Number(body.counts?.resources || 0)}</strong><span>Resources</span></div>
+        <div class="dashboard-card"><strong>${Number(body.counts?.trustedDevices || 0)}</strong><span>Trusted member devices</span></div>
         <div class="dashboard-card"><strong>${Number(body.counts?.forumTopics || 0)}</strong><span>Forum topics</span></div>
         <div class="dashboard-card"><strong>${Number(body.activeLaunches || 0)}</strong><span>Active launch tokens</span></div>
         <div class="dashboard-card"><strong>${Number(body.recentRateLimitRows || 0)}</strong><span>Recent rate-limit buckets</span></div>
@@ -1190,6 +1471,8 @@ async function renderAdminHealth(panel) {
       <div class="health-details">
         <p><strong>Supabase URL:</strong> ${body.config?.supabaseUrl ? '✅ configured' : '❌ missing'}</p>
         <p><strong>Server secret:</strong> ${body.config?.serviceRoleKey ? '✅ configured' : '❌ missing'}</p>
+        <p><strong>Email provider:</strong> ${body.config?.emailProvider ? '✅ configured' : '⚠ not configured'}</p>
+        <p><strong>Portal base URL:</strong> ${body.config?.portalBaseUrl ? '✅ configured' : '⚠ using fallback'}</p>
         <p><strong>Checked:</strong> ${escapeHtml(new Date(body.checkedAt).toLocaleString())}</p>
       </div>
       <div class="button-row"><button id="runHealthAgain" class="btn btn-accent">Run Again</button></div>`;

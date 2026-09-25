@@ -329,3 +329,21 @@ html[data-theme="colorful"] { --accent:#86efac; --primary:#fde047; }
 .health-grid .dashboard-card.bad { border-color:rgba(255,128,118,.55); }
 .health-details { margin:.65em 0; padding:.65em; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid var(--board-line); }
 .health-details p { margin:.25em 0; font-size:.76em; }
+
+/* v1.6 — trusted device security + resource library */
+.device-card { max-width: 560px; }
+.security-icon { font-size: 2.2rem; text-align:center; margin-bottom:.25rem; }
+.device-message { margin:.1rem 0 .8rem; color:var(--chalk-soft); line-height:1.45; text-align:center; }
+.security-admin-card { margin:.65em 0; padding:.75em; border-radius:14px; border:1px solid rgba(255,208,74,.45); background:rgba(255,208,74,.08); }
+.checkbox-card { display:flex !important; align-items:center; gap:.5em; padding:.6em .7em; border:1px solid var(--board-line); border-radius:10px; background:rgba(255,255,255,.06); }
+.checkbox-card input { width:auto !important; margin:0; }
+.section-heading { margin:.15em 0 .55em; font-size:1.05em; }
+.resource-heading { margin-top:1.1em; }
+.resource-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65em; }
+.resource-card { display:flex; gap:.75em; align-items:flex-start; padding:.8em; border:1px solid var(--board-line); border-radius:14px; background:rgba(255,255,255,.08); box-shadow:var(--shadow); }
+.resource-icon { font-size:1.8em; line-height:1; }
+.resource-body { min-width:0; flex:1; }
+.resource-body h3 { margin:0 0 .25em; font-size:1em; }
+.resource-body p { margin:0 0 .55em; color:var(--chalk-soft); font-size:.76em; line-height:1.35; }
+.resource-actions { display:flex; gap:.4em; flex-wrap:wrap; }
+@media (max-width:850px){ .resource-list{grid-template-columns:1fr;} }

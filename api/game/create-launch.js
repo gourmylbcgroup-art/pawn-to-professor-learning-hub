@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { enforceRateLimit } from '../_lib/rate-limit.js';
+import { sessionIdFromJwt, assertCurrentMemberDevice } from '../_lib/security.js';
 
 const json = (res, status, body) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
   if (!url || !secret) return json(res, 500, { error: 'Server configuration is incomplete.' });
 
   const activityId = String(req.body?.activityId || '').trim();
+  const deviceId = String(req.body?.deviceId || '').trim();
   if (!activityId) return json(res, 400, { error: 'Missing activity.' });
 
   const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -52,6 +54,10 @@ export default async function handler(req, res) {
 
   if (target.security_mode !== 'public') {
     if (!user || !activeProfile(profile)) return json(res, 401, { error: 'Please log in to open this activity.' });
+    const deviceCheck = await assertCurrentMemberDevice({
+      admin, profile, sessionId: sessionIdFromJwt(bearer), deviceId
+    });
+    if (!deviceCheck.ok) return json(res, 409, { error: deviceCheck.reason });
   }
 
   if (target.security_mode === 'unit' && !['admin', 'owner'].includes(profile?.role)) {
