@@ -1,0 +1,169 @@
+/* Pawn to Professor v1.6.7
+   Larger post-login board layout.
+   Login, registration and device verification keep the original classroom.
+   The larger background/layout activates ONLY while #portalView is visible. */
+
+.scene.portal-mode {
+  background-image: url('./assets/classroom-bg-portal.png') !important;
+  background-position: center center !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
+}
+
+/* Align the HTML interface with the larger green writing surface
+   in classroom-bg-portal.png (1672 × 941). */
+.scene.portal-mode .board-shell {
+  left: 22.15%;
+  top: 11.65%;
+  width: 62.10%;
+  height: 57.15%;
+  border-radius: 10px;
+}
+
+/* Give the logged-in workspace a little more breathing room. */
+.scene.portal-mode #portalView {
+  padding: 2.4% 2.8% 2.5%;
+}
+
+/* Larger header after login. */
+.scene.portal-mode .brand-kicker {
+  font-size: clamp(12px, 1.00vw, 18px);
+}
+
+.scene.portal-mode .board-header h1 {
+  font-size: clamp(25px, 2.05vw, 40px);
+}
+
+.scene.portal-mode .header-actions .btn {
+  font-size: clamp(11px, .86vw, 16px);
+  padding: .65em 1em;
+}
+
+.scene.portal-mode .breadcrumb {
+  font-size: clamp(11px, .80vw, 15px);
+  margin: .45% 0 1.2%;
+}
+
+/* Bigger dashboard / grade / unit cards. */
+.scene.portal-mode .tile-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.1%;
+}
+
+.scene.portal-mode .menu-tile {
+  min-height: clamp(84px, 7.6vw, 148px);
+  padding: 7.5% 7%;
+  border-radius: 18px;
+}
+
+.scene.portal-mode .tile-icon {
+  font-size: clamp(24px, 2.05vw, 40px);
+  margin-bottom: 4%;
+}
+
+.scene.portal-mode .tile-title {
+  font-size: clamp(16px, 1.30vw, 25px);
+}
+
+.scene.portal-mode .tile-subtitle {
+  font-size: clamp(11px, .86vw, 16px);
+  margin-top: 3%;
+}
+
+/* When a screen only has one or two cards, let them use more of the board. */
+.scene.portal-mode .tile-grid:not(:has(.menu-tile:nth-child(3))) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(76%, 900px);
+}
+
+/* Activities and teacher tools are larger too. */
+.scene.portal-mode .activity-list,
+.scene.portal-mode .tool-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.1%;
+}
+
+.scene.portal-mode .activity-card,
+.scene.portal-mode .tool-card {
+  min-height: 105px;
+  padding: 5%;
+  border-radius: 16px;
+}
+
+.scene.portal-mode .activity-card h3,
+.scene.portal-mode .tool-card h3 {
+  font-size: clamp(14px, 1.06vw, 21px);
+}
+
+.scene.portal-mode .activity-card p,
+.scene.portal-mode .tool-card p {
+  font-size: clamp(10px, .78vw, 15px);
+  line-height: 1.35;
+}
+
+.scene.portal-mode .activity-card .btn,
+.scene.portal-mode .tool-card .btn {
+  font-size: .90em;
+  padding: .62em .92em;
+}
+
+/* Resources benefit from the extra board height. */
+.scene.portal-mode .resource-card {
+  padding: .95em;
+}
+
+.scene.portal-mode .resource-body h3 {
+  font-size: 1.08em;
+}
+
+.scene.portal-mode .resource-body p {
+  font-size: .84em;
+}
+
+/* Keep administration usable: larger board, but denser cards than student menus. */
+.scene.portal-mode .admin-panel h2 {
+  font-size: clamp(17px, 1.32vw, 26px);
+}
+
+.scene.portal-mode .admin-panel h3 {
+  font-size: clamp(13px, 1vw, 19px);
+}
+
+.scene.portal-mode .admin-note,
+.scene.portal-mode .meta {
+  font-size: .78em;
+}
+
+/* Community text is easier to read on the enlarged board. */
+.scene.portal-mode .community-category strong {
+  font-size: 1.10em;
+}
+
+.scene.portal-mode .community-category > span:not(.community-icon),
+.scene.portal-mode .community-category small,
+.scene.portal-mode .community-topic p,
+.scene.portal-mode .forum-topic-detail p,
+.scene.portal-mode .forum-post p {
+  font-size: .82em;
+}
+
+/* Slightly reduce the enlargement on shorter laptop screens. */
+@media (max-height: 720px) {
+  .scene.portal-mode .board-shell {
+    left: 22.45%;
+    top: 11.9%;
+    width: 61.55%;
+    height: 56.2%;
+  }
+
+  .scene.portal-mode .menu-tile {
+    min-height: clamp(76px, 6.9vw, 132px);
+  }
+}
+
+/* Fallback for browsers without :has(). */
+@supports not selector(:has(*)) {
+  .scene.portal-mode .tile-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
