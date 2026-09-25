@@ -122,6 +122,14 @@ async function start() {
     if (attempt !== loadAttempt) return;
 
     titleEl.textContent = body.title || 'Learning Activity';
+
+    // v1.6.8 analytics: count a play only after the secure launch succeeds.
+    // The database RPC derives the exact game title / Year / Grade / Unit.
+    void client.rpc('log_usage_event', {
+      p_event_type: 'game_play',
+      p_activity_id: activityId
+    }).then(() => {}).catch(() => {});
+
     addPreconnect(body.embedUrl);
 
     // v1.4.1: make the iframe visible immediately so the browser can paint the
