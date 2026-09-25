@@ -1,7 +1,7 @@
-/* Pawn to Professor v1.6.3
-   Trusted-device verification reliability patch.
-   Loaded AFTER app.js. It intercepts the device verification form before the
-   older submit handler and provides visible status + robust retry behavior. */
+/* Pawn to Professor v1.6.5
+   Trusted-device auto-open fix.
+   Loaded AFTER app.js. After a successful device verification, open the
+   classroom directly instead of running a second login-security round trip. */
 (() => {
   const form = document.getElementById('deviceVerifyForm');
   if (!form) return;
@@ -17,20 +17,21 @@
       message.style.fontWeight = isError ? '800' : '';
     }
     if (errorBox) {
-      // Keep the lower error area in sync too, even if the board is small.
       errorBox.textContent = isError ? text : '';
     }
   }
 
   form.addEventListener('submit', async (event) => {
-    // Run before the older app.js submit listener.
     event.preventDefault();
     event.stopImmediatePropagation();
 
     const submitButton = form.querySelector('button[type="submit"]');
 
     if (!state?.pendingDeviceChallenge?.id) {
-      setVisibleStatus('Your verification session is no longer available. Please go back and sign in again.', true);
+      setVisibleStatus(
+        'Your verification session is no longer available. Please go back and sign in again.',
+        true
+      );
       return;
     }
 
@@ -49,6 +50,7 @@
 
     try {
       const headers = await authHeaders();
+
       const response = await fetch('/api/security/verify-device', {
         method: 'POST',
         headers,
@@ -70,18 +72,37 @@
       }
 
       if (!response.ok) {
-        const detail = body.error || raw || `Verification failed (${response.status}).`;
+        const detail =
+          body.error ||
+          raw ||
+          `Verification failed (${response.status}).`;
         throw new Error(detail);
       }
 
-      setVisibleStatus('✅ Device verified. Opening your classroom…');
       state.pendingDeviceChallenge = null;
+      setVisibleStatus('✅ Device verified. Opening your classroom…');
 
-      // Re-run the normal login security check. The device should now be trusted.
-      // This keeps the existing one-device/session logic intact.
-      await completeMemberLogin();
+      /*
+       * Important v1.6.5 change:
+       * verify-device already saved this exact session + device as trusted.
+       * Running completeMemberLogin() again created a second security round trip
+       * and could leave the UI waiting until a manual refresh.
+       *
+       * Go straight into the portal now. The normal 30-second security monitor
+       * still enforces the one-device rule afterwards.
+       */
+      await enterPortal();
+
+      /*
+       * Best-effort cleanup of other Supabase sessions.
+       * Do not await it, because opening the classroom must not depend on this call.
+       */
+      state.client?.auth?.signOut?.({ scope: 'others' }).catch(() => {});
     } catch (error) {
-      setVisibleStatus(`⚠️ ${error?.message || 'Verification failed. Please try again.'}`, true);
+      setVisibleStatus(
+        `⚠️ ${error?.message || 'Verification failed. Please try again.'}`,
+        true
+      );
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
