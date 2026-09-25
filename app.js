@@ -69,7 +69,11 @@ const state = {
   accessGroups: [],
   selectedAccessGroup: null,
   communityCategory: null,
-  communityTopic: null
+  communityTopic: null,
+  communityTopicPage: 0,
+  communityPostPage: 0,
+  adminUserSearch: '',
+  adminUserPage: 0
 };
 
 const aliasDomain = 'portal.local';
@@ -228,7 +232,8 @@ els.logoutBtn.addEventListener('click', async () => {
   Object.assign(state, {
     session:null, profile:null, view:'years', year:null, grade:null, unit:null,
     selectedAdminUser:null, adminUsers:[], packages:[], accessGroups:[], selectedAccessGroup:null,
-    communityCategory:null, communityTopic:null, tools:[]
+    communityCategory:null, communityTopic:null, communityTopicPage:0, communityPostPage:0,
+    adminUserSearch:'', adminUserPage:0, tools:[]
   });
   await loadPublicSettings();
   showLogin();
@@ -357,7 +362,7 @@ function renderYears() {
   if (state.settings.community_enabled) {
     grid.appendChild(makeTile({
       icon:'💬', title:'Community', subtitle:'Announcements, help and teaching ideas',
-      onClick:()=>{ state.view='community'; state.communityCategory=null; state.communityTopic=null; render(); }
+      onClick:()=>{ state.view='community'; state.communityCategory=null; state.communityTopic=null; state.communityTopicPage=0; state.communityPostPage=0; render(); }
     }));
   }
   if (state.tools.length) {
@@ -495,6 +500,7 @@ function renderAdmin() {
     ['communityAdmin','💬 Community'],
     ['design','🎨 Design Studio'],
     ['settings','⚙️ Settings'],
+    ['health','🩺 System Health'],
     ['audit','🧾 Audit Log']
   ];
   const wrap = document.createElement('div'); wrap.className='admin-wrap';
@@ -521,6 +527,7 @@ function renderAdmin() {
   if (state.adminTab === 'communityAdmin') renderAdminCommunity(panel);
   if (state.adminTab === 'design') renderAdminDesign(panel);
   if (state.adminTab === 'settings') renderAdminSettings(panel);
+  if (state.adminTab === 'health') renderAdminHealth(panel);
   if (state.adminTab === 'audit') renderAdminAudit(panel);
 }
 
@@ -547,15 +554,17 @@ async function renderAdminDashboard(panel) {
     <div class="button-row">
       <button id="exportBackup" class="btn btn-accent">Download JSON Backup</button>
       <button id="refreshDashboard" class="btn btn-ghost">Refresh</button>
+      <button id="openHealth" class="btn btn-ghost">System Health</button>
     </div>
     <p class="admin-note">Teacher tools: ${toolCount.count ?? 0}. Dynamic Access Groups: ${state.accessGroups.length}. Registration: ${state.settings.registration_enabled ? 'ON' : 'OFF'}. Community: ${state.settings.community_enabled ? 'ON' : 'OFF'}.</p>`;
   area.querySelector('#exportBackup').addEventListener('click', exportAdminBackup);
   area.querySelector('#refreshDashboard').addEventListener('click', ()=>renderAdminDashboard(panel));
+  area.querySelector('#openHealth').addEventListener('click', ()=>{ state.adminTab='health'; render(); });
 }
 
 async function exportAdminBackup() {
   const tables = ['profiles','school_years','grades','units','activities','user_unit_access','access_packages','access_package_units','access_groups','access_group_members','access_group_rules','external_tools','portal_settings','forum_categories','forum_topics','forum_posts'];
-  const backup = { exported_at:new Date().toISOString(), version:'1.4', data:{} };
+  const backup = { exported_at:new Date().toISOString(), version:'1.5', data:{} };
   for (const table of tables) {
     const { data, error } = await state.client.from(table).select('*');
     backup.data[table] = error ? { error:error.message } : data;
@@ -592,6 +601,14 @@ function renderAdminRequests(panel) {
 }
 
 function renderAdminUsers(panel) {
+  const pageSize = 25;
+  const q = (state.adminUserSearch || '').trim().toLowerCase();
+  const all = state.adminUsers.filter(u => u.status !== 'pending');
+  const filtered = q ? all.filter(u => [u.username,u.display_name,u.contact_email,u.account_tag,u.role,u.status].some(v => String(v || '').toLowerCase().includes(q))) : all;
+  const maxPage = Math.max(0, Math.ceil(filtered.length / pageSize) - 1);
+  if (state.adminUserPage > maxPage) state.adminUserPage = maxPage;
+  const pageStart = state.adminUserPage * pageSize;
+  const visible = filtered.slice(pageStart, pageStart + pageSize);
   panel.innerHTML = `
     <h2>Users & Unit Access</h2>
     <div class="admin-form-grid">
@@ -603,12 +620,25 @@ function renderAdminUsers(panel) {
     </div>
     <hr class="soft">
     <div class="admin-form-grid" style="grid-template-columns:.75fr 1.25fr">
-      <div><h3>Accounts</h3><div class="user-list" id="userList"></div></div>
+      <div>
+        <h3>Accounts</h3>
+        <div class="search-row"><input id="userSearch" class="admin-search" placeholder="Search username, name or email" value="${escapeHtml(state.adminUserSearch || '')}"><button id="userSearchBtn" class="btn btn-small btn-ghost">Search</button><button id="userSearchClear" class="btn btn-small btn-ghost">Clear</button></div>
+        <div class="meta" style="margin:.35em 0">${filtered.length} matching account${filtered.length===1?'':'s'} · showing ${filtered.length ? pageStart+1 : 0}–${Math.min(pageStart+pageSize, filtered.length)}</div>
+        <div class="user-list" id="userList"></div>
+        <div class="pager"><button id="usersPrev" class="btn btn-small btn-ghost" ${state.adminUserPage===0?'disabled':''}>← Previous</button><span>Page ${state.adminUserPage+1} / ${maxPage+1}</span><button id="usersNext" class="btn btn-small btn-ghost" ${state.adminUserPage>=maxPage?'disabled':''}>Next →</button></div>
+      </div>
       <div id="permissionEditor"><p class="admin-note">Select a user to control role, status, notes and exact unit access.</p></div>
     </div>`;
   panel.querySelector('#createUserBtn').addEventListener('click', createUserFromAdmin);
+  const search = panel.querySelector('#userSearch');
+  const runSearch=()=>{ state.adminUserSearch=search.value.trim(); state.adminUserPage=0; renderAdminUsers(panel); };
+  panel.querySelector('#userSearchBtn').addEventListener('click',runSearch);
+  panel.querySelector('#userSearchClear').addEventListener('click',()=>{ state.adminUserSearch=''; state.adminUserPage=0; renderAdminUsers(panel); });
+  search.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();runSearch();}});
+  panel.querySelector('#usersPrev').addEventListener('click',()=>{ if(state.adminUserPage>0){state.adminUserPage--;renderAdminUsers(panel);} });
+  panel.querySelector('#usersNext').addEventListener('click',()=>{ if(state.adminUserPage<maxPage){state.adminUserPage++;renderAdminUsers(panel);} });
   const userList = panel.querySelector('#userList');
-  state.adminUsers.filter(u => u.status !== 'pending').forEach(user => {
+  visible.forEach(user => {
     const row = document.createElement('button'); row.className=`user-row ${state.selectedAdminUser?.id===user.id?'active':''}`;
     row.innerHTML = `<span><strong>${escapeHtml(user.username || 'user')}</strong><br><small>${escapeHtml(user.display_name || '')}</small></span><span>${roleBadge(user.role)}<br><small>${escapeHtml(user.status)}</small></span>`;
     row.addEventListener('click', async () => {
@@ -617,6 +647,7 @@ function renderAdminUsers(panel) {
     });
     userList.appendChild(row);
   });
+  if (!visible.length) userList.innerHTML='<p class="admin-note">No matching accounts.</p>';
   if (state.selectedAdminUser) renderAdminUserPermissions(panel.querySelector('#permissionEditor'), state.selectedAdminUser);
 }
 
@@ -1126,6 +1157,49 @@ function renderAdminSettings(panel) {
   });
 }
 
+async function renderAdminHealth(panel) {
+  panel.innerHTML = `
+    <h2>System Health</h2>
+    <p class="admin-note">Quick checks for the Learning Hub backend. This page does not expose secrets.</p>
+    <div id="healthArea"><div class="empty-state" style="height:120px">Running checks…</div></div>`;
+  try {
+    const { data: { session } } = await state.client.auth.getSession();
+    const res = await fetch('/api/admin/system-health', {
+      headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+      cache: 'no-store'
+    });
+    const body = await res.json().catch(()=>({}));
+    if (state.adminTab !== 'health') return;
+    const area = panel.querySelector('#healthArea');
+    if (!res.ok) {
+      area.innerHTML = `<div class="health-banner bad">⚠ ${escapeHtml(body.error || 'Health check failed.')}</div>`;
+      return;
+    }
+    const statusClass = body.ok ? 'good' : 'warn';
+    const dbClass = Number(body.databaseLatencyMs || 9999) < 700 ? 'good' : Number(body.databaseLatencyMs || 9999) < 2000 ? 'warn' : 'bad';
+    area.innerHTML = `
+      <div class="health-banner ${statusClass}">${body.ok ? '✅ Core services responding' : '⚠ Some checks need attention'}</div>
+      <div class="dashboard-grid health-grid">
+        <div class="dashboard-card ${dbClass}"><strong>${Number(body.databaseLatencyMs || 0)} ms</strong><span>Database check</span></div>
+        <div class="dashboard-card"><strong>${Number(body.counts?.profiles || 0)}</strong><span>Accounts</span></div>
+        <div class="dashboard-card"><strong>${Number(body.counts?.activities || 0)}</strong><span>Activities</span></div>
+        <div class="dashboard-card"><strong>${Number(body.counts?.forumTopics || 0)}</strong><span>Forum topics</span></div>
+        <div class="dashboard-card"><strong>${Number(body.activeLaunches || 0)}</strong><span>Active launch tokens</span></div>
+        <div class="dashboard-card"><strong>${Number(body.recentRateLimitRows || 0)}</strong><span>Recent rate-limit buckets</span></div>
+      </div>
+      <div class="health-details">
+        <p><strong>Supabase URL:</strong> ${body.config?.supabaseUrl ? '✅ configured' : '❌ missing'}</p>
+        <p><strong>Server secret:</strong> ${body.config?.serviceRoleKey ? '✅ configured' : '❌ missing'}</p>
+        <p><strong>Checked:</strong> ${escapeHtml(new Date(body.checkedAt).toLocaleString())}</p>
+      </div>
+      <div class="button-row"><button id="runHealthAgain" class="btn btn-accent">Run Again</button></div>`;
+    area.querySelector('#runHealthAgain').addEventListener('click',()=>renderAdminHealth(panel));
+  } catch (err) {
+    if (state.adminTab !== 'health') return;
+    panel.querySelector('#healthArea').innerHTML = `<div class="health-banner bad">⚠ ${escapeHtml(err.message || 'Could not run health checks.')}</div>`;
+  }
+}
+
 async function renderAdminAudit(panel) {
   panel.innerHTML='<h2>Audit Log</h2><p class="admin-note">Recent administrative changes. This is useful when more than one administrator manages the portal.</p><div id="auditList" class="audit-list">Loading…</div>';
   const {data,error}=await state.client.from('audit_log').select('*').order('created_at',{ascending:false}).limit(100);
@@ -1271,7 +1345,7 @@ async function renderCommunity() {
   (data||[]).forEach(cat=>{
     const card=document.createElement('button');card.className='community-category';
     card.innerHTML=`<span class="community-icon">${escapeHtml(cat.icon||'💬')}</span><strong>${escapeHtml(cat.name)}</strong><span>${escapeHtml(cat.description||'')}</span>${cat.staff_only_post?'<small>Admin announcements</small>':''}`;
-    card.addEventListener('click',()=>{state.communityCategory=cat;state.view='communityCategory';render();});grid.appendChild(card);
+    card.addEventListener('click',()=>{state.communityCategory=cat;state.communityTopicPage=0;state.view='communityCategory';render();});grid.appendChild(card);
   });
   if(!data?.length)els.content.innerHTML='<div class="empty-state">Community is enabled, but no categories are available.</div>';else els.content.appendChild(grid);
 }
@@ -1280,7 +1354,8 @@ async function renderCommunityCategory() {
   const cat=state.communityCategory;if(!cat){state.view='community';return render();}
   setHeader(cat.name,['Community',cat.name]);
   els.content.innerHTML='<div class="empty-state">Loading discussions…</div>';
-  const {data:topics,error}=await state.client.from('forum_topics').select('*').eq('category_id',cat.id).is('deleted_at',null).order('pinned',{ascending:false}).order('created_at',{ascending:false});
+  const topicPageSize=20; const topicFrom=state.communityTopicPage*topicPageSize;
+  const {data:topics,error,count}=await state.client.from('forum_topics').select('*',{count:'exact'}).eq('category_id',cat.id).is('deleted_at',null).order('pinned',{ascending:false}).order('created_at',{ascending:false}).range(topicFrom,topicFrom+topicPageSize-1);
   if(state.view!=='communityCategory')return;
   els.content.innerHTML='';if(error){els.content.innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;return;}
   const canPost=!cat.staff_only_post||isStaff();
@@ -1299,7 +1374,7 @@ async function renderCommunityCategory() {
   (topics||[]).forEach(topic=>{
     const card=document.createElement('div');card.className=`community-topic ${topic.pinned?'pinned':''}`;
     card.innerHTML=`<div class="topic-main"><strong>${topic.pinned?'📌 ':''}${escapeHtml(topic.title)} ${topic.locked?'🔒':''}</strong><div class="meta">${escapeHtml(topic.author_label)} · ${new Date(topic.created_at).toLocaleString()}${topic.unit_id?` · ${escapeHtml(unitPath(topic.unit_id))}`:''}</div><p>${escapeHtml(topic.body).slice(0,220)}</p></div><div class="actions"><button class="btn btn-small btn-ghost" data-open>Open</button>${isStaff()?'<button class="btn btn-small btn-ghost" data-pin>Pin</button><button class="btn btn-small btn-ghost" data-lock>Lock</button><button class="btn btn-small btn-danger" data-delete>Remove</button>':''}</div>`;
-    card.querySelector('[data-open]').addEventListener('click',()=>{state.communityTopic=topic;state.view='communityTopic';render();});
+    card.querySelector('[data-open]').addEventListener('click',()=>{state.communityTopic=topic;state.communityPostPage=0;state.view='communityTopic';render();});
     if(isStaff()){
       card.querySelector('[data-pin]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_topics').update({pinned:!topic.pinned}).eq('id',topic.id);if(e)toast(e.message);else renderCommunityCategory();});
       card.querySelector('[data-lock]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_topics').update({locked:!topic.locked}).eq('id',topic.id);if(e)toast(e.message);else renderCommunityCategory();});
@@ -1308,17 +1383,34 @@ async function renderCommunityCategory() {
     list.appendChild(card);
   });
   els.content.appendChild(list);
+  const topicPages=Math.max(1,Math.ceil((count||0)/topicPageSize));
+  if(topicPages>1){
+    const pager=document.createElement('div');pager.className='pager';
+    pager.innerHTML=`<button class="btn btn-small btn-ghost" data-prev ${state.communityTopicPage===0?'disabled':''}>← Previous</button><span>Page ${state.communityTopicPage+1} / ${topicPages}</span><button class="btn btn-small btn-ghost" data-next ${state.communityTopicPage>=topicPages-1?'disabled':''}>Next →</button>`;
+    pager.querySelector('[data-prev]').addEventListener('click',()=>{if(state.communityTopicPage>0){state.communityTopicPage--;renderCommunityCategory();}});
+    pager.querySelector('[data-next]').addEventListener('click',()=>{if(state.communityTopicPage<topicPages-1){state.communityTopicPage++;renderCommunityCategory();}});
+    els.content.appendChild(pager);
+  }
 }
 
 async function renderCommunityTopic() {
   const topic=state.communityTopic,cat=state.communityCategory;if(!topic||!cat){state.view='community';return render();}
   setHeader(topic.title,['Community',cat.name,topic.title]);
   els.content.innerHTML='<div class="empty-state">Loading replies…</div>';
-  const {data:posts,error}=await state.client.from('forum_posts').select('*').eq('topic_id',topic.id).is('deleted_at',null).order('created_at');
+  const postPageSize=30; const postFrom=state.communityPostPage*postPageSize;
+  const {data:posts,error,count}=await state.client.from('forum_posts').select('*',{count:'exact'}).eq('topic_id',topic.id).is('deleted_at',null).order('created_at').range(postFrom,postFrom+postPageSize-1);
   if(state.view!=='communityTopic')return;
   els.content.innerHTML='';if(error){els.content.innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;return;}
   const head=document.createElement('article');head.className='forum-topic-detail';head.innerHTML=`<h2>${topic.pinned?'📌 ':''}${escapeHtml(topic.title)} ${topic.locked?'🔒':''}</h2><div class="meta">${escapeHtml(topic.author_label)} · ${new Date(topic.created_at).toLocaleString()}${topic.unit_id?` · ${escapeHtml(unitPath(topic.unit_id))}`:''}</div><p>${escapeHtml(topic.body).replace(/\n/g,'<br>')}</p>`;els.content.appendChild(head);
   const list=document.createElement('div');list.className='forum-post-list';(posts||[]).forEach(post=>{const card=document.createElement('div');card.className='forum-post';card.innerHTML=`<div><strong>${escapeHtml(post.author_label)}</strong><span class="meta"> ${new Date(post.created_at).toLocaleString()}</span><p>${escapeHtml(post.body).replace(/\n/g,'<br>')}</p></div>${isStaff()?'<button class="btn btn-small btn-danger">Remove</button>':''}`;if(isStaff())card.querySelector('button').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_posts').update({deleted_at:new Date().toISOString()}).eq('id',post.id);if(e)toast(e.message);else renderCommunityTopic();});list.appendChild(card);});els.content.appendChild(list);
+  const postPages=Math.max(1,Math.ceil((count||0)/postPageSize));
+  if(postPages>1){
+    const pager=document.createElement('div');pager.className='pager';
+    pager.innerHTML=`<button class="btn btn-small btn-ghost" data-prev ${state.communityPostPage===0?'disabled':''}>← Previous</button><span>Page ${state.communityPostPage+1} / ${postPages}</span><button class="btn btn-small btn-ghost" data-next ${state.communityPostPage>=postPages-1?'disabled':''}>Next →</button>`;
+    pager.querySelector('[data-prev]').addEventListener('click',()=>{if(state.communityPostPage>0){state.communityPostPage--;renderCommunityTopic();}});
+    pager.querySelector('[data-next]').addEventListener('click',()=>{if(state.communityPostPage<postPages-1){state.communityPostPage++;renderCommunityTopic();}});
+    els.content.appendChild(pager);
+  }
   if(!topic.locked||isStaff()){
     const reply=document.createElement('div');reply.className='community-compose';reply.innerHTML=`<textarea id="replyBody" rows="3" placeholder="Write a reply…"></textarea><button id="postReply" class="btn btn-accent btn-small">Reply</button>`;reply.querySelector('#postReply').addEventListener('click',async()=>{const body=reply.querySelector('#replyBody').value.trim();if(!body)return;const authorLabel=state.profile.display_name||state.profile.username||'Member';const {error:e}=await state.client.from('forum_posts').insert({topic_id:topic.id,author_id:state.session.user.id,author_label:authorLabel,body});if(e)return toast(e.message);toast('Reply posted.');renderCommunityTopic();});els.content.appendChild(reply);
   }

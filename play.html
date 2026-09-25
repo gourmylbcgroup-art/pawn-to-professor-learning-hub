@@ -20,13 +20,26 @@
       </div>
     </header>
 
-    <section id="status" class="status-card">
-      <div class="spinner" aria-hidden="true"></div>
-      <strong>Checking your access…</strong>
-      <span>This secure link only works for an authorized account.</span>
-    </section>
+    <section class="game-stage" id="gameStage">
+      <iframe
+        id="gameFrame"
+        class="game-frame"
+        title="Learning activity"
+        allow="fullscreen; autoplay"
+        referrerpolicy="no-referrer"
+        loading="eager"
+        fetchpriority="high"
+      ></iframe>
 
-    <iframe id="gameFrame" class="hidden" title="Learning activity" allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
+      <div id="status" class="status-overlay" role="status" aria-live="polite">
+        <div class="status-panel">
+          <div class="spinner" aria-hidden="true"></div>
+          <strong id="statusTitle">Checking your access…</strong>
+          <span id="statusMessage">This secure link only works for an authorized account.</span>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar"></div></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

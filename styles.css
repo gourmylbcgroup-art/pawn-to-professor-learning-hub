@@ -314,3 +314,18 @@ html[data-theme="colorful"] { --accent:#86efac; --primary:#fde047; }
   .community-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .group-member-grid { grid-template-columns:1fr; }
 }
+
+
+/* v1.5 — performance/reliability UI */
+.admin-search { width:100%; margin:.25em 0; padding:.62em .72em; border-radius:10px; border:1px solid rgba(255,255,255,.28); background:rgba(255,255,255,.95); color:#143b31; }
+.pager { display:flex; align-items:center; justify-content:center; gap:.55em; margin:.65em 0; color:var(--chalk-soft); font-size:.78em; }
+.pager button:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+.health-banner { padding:.7em .8em; border-radius:12px; margin:.25em 0 .75em; border:1px solid var(--board-line); font-weight:900; }
+.health-banner.good { background:rgba(117,224,179,.14); border-color:rgba(117,224,179,.55); }
+.health-banner.warn { background:rgba(255,208,74,.14); border-color:rgba(255,208,74,.55); }
+.health-banner.bad { background:rgba(255,128,118,.14); border-color:rgba(255,128,118,.55); }
+.health-grid .dashboard-card.good { border-color:rgba(117,224,179,.55); }
+.health-grid .dashboard-card.warn { border-color:rgba(255,208,74,.55); }
+.health-grid .dashboard-card.bad { border-color:rgba(255,128,118,.55); }
+.health-details { margin:.65em 0; padding:.65em; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid var(--board-line); }
+.health-details p { margin:.25em 0; font-size:.76em; }

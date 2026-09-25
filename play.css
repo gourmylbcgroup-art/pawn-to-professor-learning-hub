@@ -1,18 +1,143 @@
-:root { color-scheme: dark; --green:#0f5a42; --mint:#75e0b3; --yellow:#ffd04a; }
+:root {
+  color-scheme: dark;
+  --green:#0f5a42;
+  --mint:#75e0b3;
+  --yellow:#ffd04a;
+}
 * { box-sizing:border-box; }
-html,body { margin:0; width:100%; height:100%; font-family:Inter,"Segoe UI",system-ui,sans-serif; background:#082f25; color:#fff; }
+html,body {
+  margin:0;
+  width:100%;
+  height:100%;
+  font-family:Inter,"Segoe UI",system-ui,sans-serif;
+  background:#082f25;
+  color:#fff;
+}
 body { overflow:hidden; }
 .hidden { display:none !important; }
-.player-shell { height:100%; display:grid; grid-template-rows:auto 1fr; background:linear-gradient(180deg,#0e5c43,#072f25); }
-.player-bar { min-height:74px; display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.8rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.18); box-shadow:0 5px 20px rgba(0,0,0,.18); }
-.kicker { color:var(--yellow); font-weight:900; letter-spacing:.14em; font-size:.72rem; }
+.player-shell {
+  height:100%;
+  display:grid;
+  grid-template-rows:auto 1fr;
+  background:linear-gradient(180deg,#0e5c43,#072f25);
+}
+.player-bar {
+  min-height:74px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:1rem;
+  padding:.8rem 1.1rem;
+  border-bottom:1px solid rgba(255,255,255,.18);
+  box-shadow:0 5px 20px rgba(0,0,0,.18);
+  position:relative;
+  z-index:5;
+}
+.kicker {
+  color:var(--yellow);
+  font-weight:900;
+  letter-spacing:.14em;
+  font-size:.72rem;
+}
 h1 { margin:.15rem 0 0; font-size:clamp(1.05rem,2vw,1.55rem); }
 .player-actions { display:flex; gap:.55rem; }
-button { border:0; border-radius:999px; padding:.65rem 1rem; font-weight:900; background:var(--mint); color:#103b30; cursor:pointer; }
-#backBtn { background:rgba(255,255,255,.13); color:#fff; border:1px solid rgba(255,255,255,.2); }
-.status-card { align-self:center; justify-self:center; display:grid; justify-items:center; gap:.8rem; text-align:center; max-width:520px; padding:2rem; color:rgba(255,255,255,.88); }
-.status-card strong { color:#fff; font-size:1.2rem; }
-.status-card.error strong { color:#ffd3ce; }
-.spinner { width:38px; height:38px; border:4px solid rgba(255,255,255,.2); border-top-color:var(--yellow); border-radius:50%; animation:spin .8s linear infinite; }
+button {
+  border:0;
+  border-radius:999px;
+  padding:.65rem 1rem;
+  font-weight:900;
+  background:var(--mint);
+  color:#103b30;
+  cursor:pointer;
+}
+#backBtn {
+  background:rgba(255,255,255,.13);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.2);
+}
+
+.game-stage {
+  min-height:0;
+  position:relative;
+  overflow:hidden;
+  background:#fff;
+}
+.game-frame {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  background:#fff;
+  opacity:1;
+  transition:opacity .25s ease;
+}
+.game-frame.frame-muted { opacity:.08; }
+
+.status-overlay {
+  position:absolute;
+  inset:0;
+  z-index:4;
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,47,37,.76),rgba(7,47,37,.50));
+  transition:opacity .22s ease;
+}
+.status-panel {
+  width:min(92vw,540px);
+  display:grid;
+  justify-items:center;
+  gap:.8rem;
+  text-align:center;
+  padding:1.6rem 1.8rem;
+  border-radius:22px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(8,47,37,.80);
+  box-shadow:0 18px 55px rgba(0,0,0,.28);
+  backdrop-filter:blur(7px);
+  color:rgba(255,255,255,.88);
+}
+.status-panel strong { color:#fff; font-size:1.2rem; }
+.status-overlay.error .status-panel strong { color:#ffd3ce; }
+.status-overlay.error .spinner { display:none; }
+
+.spinner {
+  width:38px;
+  height:38px;
+  border:4px solid rgba(255,255,255,.2);
+  border-top-color:var(--yellow);
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
 @keyframes spin { to { transform:rotate(360deg); } }
-#gameFrame { width:100%; height:100%; border:0; background:#fff; }
+
+.progress-track {
+  width:min(360px,72vw);
+  height:7px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.14);
+}
+.progress-bar {
+  width:42%;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--yellow),var(--mint));
+  animation:progress-slide 1.25s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  from { transform:translateX(-115%); }
+  to { transform:translateX(255%); }
+}
+
+/* The retry button lives in the header, so it remains clickable while the overlay is non-interactive. */
+@media (max-width:700px) {
+  .player-bar { min-height:64px; padding:.65rem .8rem; }
+  .player-actions button { padding:.55rem .78rem; }
+  .status-panel { padding:1.2rem; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+}

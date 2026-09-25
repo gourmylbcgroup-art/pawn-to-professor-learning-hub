@@ -1,37 +1,30 @@
-# Pawn to Professor Learning Hub v1.4
+# Pawn to Professor Learning Hub v1.5
 
-v1.4 focuses on **commercial access reliability**, **automatic paid-member access**, and a moderated **Community Forum**.
+**Performance & Reliability update** for the existing v1.4 / v1.4.1 Learning Hub.
+
+This release deliberately avoids adding major new product features. It focuses on keeping the existing portal responsive and easier to diagnose as the number of teachers, games and Community posts grows.
 
 ## Main changes
 
-- Admin and Owner now have automatic full access to every Year, Grade, Unit and Game.
-- Fixes the staff-access loading race that could incorrectly show locked Units.
-- Dynamic **Access Groups** for paid plans:
-  - Entire Learning Hub
-  - One Year, including future Grades/Units
-  - One Grade, including future Units
-  - One specific Unit
-- New games inside an already-authorized Unit become available automatically.
-- Staff can preview a user's effective access before testing the account.
-- Community Forum:
-  - Announcements
-  - Help & Questions
-  - Teaching Ideas
-  - Game Feedback
-  - Grade Discussions
-  - Technical Support
-- Owner/Admin moderation: pin, lock, remove topics/replies, enable/disable categories.
-- Community can be enabled or disabled from Admin > Settings.
-- Secure-game status now tracks whether the Direct Game Gate has been installed.
-- Secure launcher now honors Dynamic Access Groups server-side.
-- Backups include Access Groups and Community data.
+- Database indexes for the queries used most often by the portal.
+- Server-side rate limiting for public registration, Admin user creation and secure game launch requests.
+- Community anti-spam write limits.
+- Forum topic pagination: 20 discussions per page.
+- Forum reply pagination: 30 replies per page.
+- Admin user search and 25-account pages so the board does not try to render every account at once.
+- Owner/Admin **System Health** page with database latency and basic service counts.
+- Automatic cleanup of stale rate-limit rows and old launch tokens during health checks.
+- Improved caching for static classroom assets.
+- Includes the v1.4.1 fast secure-player files.
 
 ## Important
 
-This package assumes that v1.3 is already installed. Run only:
+This package assumes **v1.4 is already installed**. Run only:
 
-`supabase/v1.4-smart-access-community.sql`
+`supabase/v1.5-performance-reliability.sql`
 
-Do **not** rerun the original `schema.sql`.
+Do not rerun the original `schema.sql` or older migrations.
 
-See `SETUP-v1.4.md` for the complete installation and testing procedure.
+No new Vercel environment variables are required.
+
+Read `SETUP-v1.5.md` before uploading the files.

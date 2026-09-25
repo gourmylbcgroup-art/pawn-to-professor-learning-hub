@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { enforceRateLimit } from './_lib/rate-limit.js';
 
 function cleanUsername(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -16,6 +17,9 @@ export default async function handler(req, res) {
   if (!url || !serviceRoleKey) return res.status(500).json({ error: 'Server configuration is incomplete.' });
 
   const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const rate = await enforceRateLimit({ admin, req, res, scope: 'register', windowSeconds: 600, maxHits: 5 });
+  if (!rate.allowed) return res.status(429).json({ error: 'Too many registration attempts. Please wait a few minutes and try again.' });
 
   const { data: settings, error: settingsError } = await admin
     .from('portal_settings')

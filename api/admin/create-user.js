@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { enforceRateLimit } from '../_lib/rate-limit.js';
 
 function cleanUsername(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -32,6 +33,9 @@ export default async function handler(req, res) {
   if (callerError || !['admin','owner'].includes(caller?.role) || caller?.status !== 'active' || expired) {
     return res.status(403).json({ error: 'Administrator or owner access required.' });
   }
+
+  const rate = await enforceRateLimit({ admin, req, res, scope: 'admin-create-user', userId: authData.user.id, windowSeconds: 600, maxHits: 30 });
+  if (!rate.allowed) return res.status(429).json({ error: 'Too many account-creation requests. Please wait and try again.' });
 
   const username = cleanUsername(req.body?.username);
   const password = String(req.body?.password || '');

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { enforceRateLimit } from '../_lib/rate-limit.js';
 
 const json = (res, status, body) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -43,6 +44,11 @@ export default async function handler(req, res) {
       profile = data || null;
     }
   }
+
+  const launchRate = await enforceRateLimit({
+    admin, req, res, scope: 'game-launch', userId: user?.id || '', windowSeconds: 60, maxHits: 120
+  });
+  if (!launchRate.allowed) return json(res, 429, { error: 'Too many game-launch requests. Please wait a moment and try again.' });
 
   if (target.security_mode !== 'public') {
     if (!user || !activeProfile(profile)) return json(res, 401, { error: 'Please log in to open this activity.' });
