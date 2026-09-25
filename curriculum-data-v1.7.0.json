@@ -1,0 +1,1181 @@
+{
+  "source": "Yunlin County Year 115 curriculum (uploaded by user)",
+  "site_year": "2026",
+  "note": "Topic/subtopic fields are Pawn to Professor editorial classifications; objective/vocabulary/target language are curriculum-derived.",
+  "topics": [
+    {
+      "name": "Introductions & Identity",
+      "slug": "introductions-identity",
+      "icon": "👋",
+      "sort_order": 10
+    },
+    {
+      "name": "Numbers & Personal Information",
+      "slug": "numbers-personal-information",
+      "icon": "🔢",
+      "sort_order": 20
+    },
+    {
+      "name": "Family & People",
+      "slug": "family-people",
+      "icon": "👨‍👩‍👧",
+      "sort_order": 30
+    },
+    {
+      "name": "Colors & Feelings",
+      "slug": "colors-feelings",
+      "icon": "🎨",
+      "sort_order": 40
+    },
+    {
+      "name": "Festivals & Culture",
+      "slug": "festivals-culture",
+      "icon": "🎉",
+      "sort_order": 50
+    },
+    {
+      "name": "Abilities & Hobbies",
+      "slug": "abilities-hobbies",
+      "icon": "⭐",
+      "sort_order": 60
+    },
+    {
+      "name": "School & Classroom",
+      "slug": "school-classroom",
+      "icon": "🏫",
+      "sort_order": 70
+    },
+    {
+      "name": "Places & Community",
+      "slug": "places-community",
+      "icon": "🏙️",
+      "sort_order": 80
+    },
+    {
+      "name": "Time & Daily Routines",
+      "slug": "time-daily-routines",
+      "icon": "🕐",
+      "sort_order": 90
+    },
+    {
+      "name": "Actions & Verbs",
+      "slug": "actions-verbs",
+      "icon": "🏃",
+      "sort_order": 100
+    },
+    {
+      "name": "Food & Drinks",
+      "slug": "food-drinks",
+      "icon": "🍽️",
+      "sort_order": 110
+    },
+    {
+      "name": "Weather & Seasons",
+      "slug": "weather-seasons",
+      "icon": "☀️",
+      "sort_order": 120
+    },
+    {
+      "name": "Travel & Transportation",
+      "slug": "travel-transportation",
+      "icon": "✈️",
+      "sort_order": 130
+    },
+    {
+      "name": "Countries & World",
+      "slug": "countries-world",
+      "icon": "🌍",
+      "sort_order": 140
+    },
+    {
+      "name": "Shopping & Money",
+      "slug": "shopping-money",
+      "icon": "🛍️",
+      "sort_order": 150
+    },
+    {
+      "name": "Work & Industry",
+      "slug": "work-industry",
+      "icon": "🏭",
+      "sort_order": 160
+    },
+    {
+      "name": "Clothing",
+      "slug": "clothing",
+      "icon": "👕",
+      "sort_order": 170
+    },
+    {
+      "name": "Sports & Free Time",
+      "slug": "sports-free-time",
+      "icon": "⚽",
+      "sort_order": 180
+    },
+    {
+      "name": "People & Media",
+      "slug": "people-media",
+      "icon": "🎤",
+      "sort_order": 190
+    }
+  ],
+  "units": [
+    {
+      "g": 3,
+      "u": 1,
+      "title": "Greeting",
+      "topic": "Introductions & Identity",
+      "sub": "Greetings & Names",
+      "objective": "Students can confidently introduce themselves and ask for others' names using basic greetings.",
+      "vocab": [
+        "pizza",
+        "noodles",
+        "rice",
+        "ice cream",
+        "dog",
+        "cat",
+        "rabbit",
+        "bird",
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "reading",
+        "drawing",
+        "soccer",
+        "swimming"
+      ],
+      "target": [
+        "Hi / Hello",
+        "Good morning / Good Afternoon",
+        "What’s your name?",
+        "My name is…",
+        "Nice to meet you."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 2,
+      "title": "How Old Am I?",
+      "topic": "Numbers & Personal Information",
+      "sub": "Numbers 1–10 & Age",
+      "objective": "Students can accurately use numbers 1–10 to express age, quantity, and personal contact info. Recognize numerals (1–10) first; high-level classes can attempt the written words (one–ten).",
+      "vocab": [
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten"
+      ],
+      "target": [
+        "How old are you?",
+        "One, two…ten"
+      ]
+    },
+    {
+      "g": 3,
+      "u": 3,
+      "title": "My Family, My Pet and Me",
+      "topic": "Family & People",
+      "sub": "Family & Pets",
+      "objective": "Students can identify and introduce their family members and pets using target sentence patterns.",
+      "vocab": [
+        "grandfather",
+        "grandmother",
+        "father",
+        "mother",
+        "brother",
+        "sister",
+        "*uncle",
+        "*aunt",
+        "cat",
+        "dog",
+        "bird",
+        "fish",
+        "*rabbit",
+        "*hamster"
+      ],
+      "target": [
+        "Who is he/she?",
+        "He/She is my ….",
+        "This is a …",
+        "That is a …"
+      ]
+    },
+    {
+      "g": 3,
+      "u": 4,
+      "title": "Beautiful Color, My Feelings",
+      "topic": "Colors & Feelings",
+      "sub": "Colors & Emotions",
+      "objective": "Students can connect colors with emotions and ask / answer questions about feelings.",
+      "vocab": [
+        "yellow",
+        "green",
+        "red",
+        "black",
+        "pink",
+        "blue",
+        "white"
+      ],
+      "target": [
+        "What color is it?",
+        "It’s…"
+      ]
+    },
+    {
+      "g": 3,
+      "u": 5,
+      "title": "Festivals and Holidays",
+      "topic": "Festivals & Culture",
+      "sub": "New Year Traditions",
+      "objective": "Students can distinguish between different New Year traditions and express festive wishes in English.",
+      "vocab": [
+        "New Year",
+        "family",
+        "food",
+        "happy",
+        "wish",
+        "lucky",
+        "fireworks",
+        "red envelope"
+      ],
+      "target": [
+        "Happy New Year!",
+        "I wish you _____.",
+        "I am happy.",
+        "I am lucky.",
+        "I like ______."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 6,
+      "title": "I Am a Star",
+      "topic": "Abilities & Hobbies",
+      "sub": "Abilities & Talents",
+      "objective": "Students can use \"can\" to interview peers, record data, and express individual abilities.",
+      "vocab": [
+        "dance",
+        "sing",
+        "run",
+        "jump",
+        "swim",
+        "draw",
+        "cook"
+      ],
+      "target": [
+        "I can dance."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 7,
+      "title": "Getting To Know My Class",
+      "topic": "School & Classroom",
+      "sub": "Classroom Objects & Ownership",
+      "objective": "Students can identify common classroom objects and ask/answer questions about ownership.",
+      "vocab": [
+        "pencil",
+        "marker",
+        "eraser",
+        "ruler",
+        "book",
+        "pen",
+        "workbook",
+        "backpack"
+      ],
+      "target": [
+        "What is this/that?",
+        "Is that your pencil?",
+        "Yes, it is.",
+        "No, it is not."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 8,
+      "title": "Our School",
+      "topic": "School & Classroom",
+      "sub": "School People",
+      "objective": "Students can identify school staff roles and briefly describe people within the school community.",
+      "vocab": [
+        "teacher",
+        "principal",
+        "director",
+        "student",
+        "nurse",
+        "friend",
+        "cook"
+      ],
+      "target": [
+        "Who is he/she?",
+        "He/She is my teacher.",
+        "Mr./Mrs./Miss Wang is my teacher.",
+        "He is tall/short."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 9,
+      "title": "My Campus Life",
+      "topic": "School & Classroom",
+      "sub": "School Activities & Abilities",
+      "objective": "Students can describe common school activities and recognize proper sentence structures.",
+      "vocab": [
+        "jump",
+        "sing",
+        "run",
+        "draw",
+        "dance",
+        "write",
+        "read",
+        "play"
+      ],
+      "target": [
+        "Can you jump?",
+        "Yes, I can jump.",
+        "No, I can't.",
+        "I can/can't jump."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 10,
+      "title": "My Favorite Campus Corner (1)",
+      "topic": "Places & Community",
+      "sub": "School Places & Preferences",
+      "objective": "Students can identify key school locations and state their personal preferences.",
+      "vocab": [
+        "playground",
+        "gym",
+        "classroom",
+        "library",
+        "office",
+        "quiet"
+      ],
+      "target": [
+        "I like the playground.",
+        "It is big/small."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 11,
+      "title": "My Favorite Campus Corner (2)",
+      "topic": "Places & Community",
+      "sub": "School Places & Activities",
+      "objective": "Students can associate school locations with activities and express them in complete sentences.",
+      "vocab": [
+        "slide",
+        "swing",
+        "kick"
+      ],
+      "target": [
+        "I can play at the playground."
+      ]
+    },
+    {
+      "g": 3,
+      "u": 12,
+      "title": "Flexibility — Holidays",
+      "topic": "Festivals & Culture",
+      "sub": "Holiday Sharing",
+      "objective": "Students can use key holiday vocabulary in meaningful social contexts and experience cultural traditions.",
+      "vocab": [
+        "holiday",
+        "family",
+        "friends",
+        "food",
+        "game",
+        "gift",
+        "happy",
+        "fun"
+      ],
+      "target": [
+        "It is ______.",
+        "Happy ______!",
+        "I like ______.",
+        "We eat ______.",
+        "We play ______.",
+        "My family celebrates ______.",
+        "My favorite holiday is ______.",
+        "It is fun!"
+      ]
+    },
+    {
+      "g": 4,
+      "u": 1,
+      "title": "My Community",
+      "topic": "Places & Community",
+      "sub": "Community Locations",
+      "objective": "Students can visually identify and name 10 essential community locations and verbally state their own location using the formula \"I am at the...\" when prompted with heavy visual support.",
+      "vocab": [
+        "hospital",
+        "park",
+        "library",
+        "bank",
+        "school",
+        "supermarket",
+        "store",
+        "night market",
+        "tea shop",
+        "café"
+      ],
+      "target": [
+        "Where are you?",
+        "I am at the park."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 2,
+      "title": "My Community Life",
+      "topic": "Time & Daily Routines",
+      "sub": "Time & Community Schedules",
+      "objective": "Students can recognize simple digital and analog clock times (focusing on hours and basic intervals) and link a specific time to a community location.",
+      "vocab": [
+        "1–59",
+        "ten",
+        "fifteen",
+        "twenty"
+      ],
+      "target": [
+        "What time is it?",
+        "It's 08:00 (o'clock).",
+        "I go to the park at 17:00."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 3,
+      "title": "Observing the Community",
+      "topic": "Actions & Verbs",
+      "sub": "Present Continuous Actions",
+      "objective": "Students can identify and verbally describe basic physical actions occurring in their community using the present continuous tense (-ing) with basic pronouns (he/she/I).",
+      "vocab": [
+        "jumping",
+        "singing",
+        "running",
+        "drawing",
+        "dancing",
+        "writing",
+        "reading",
+        "playing",
+        "eating",
+        "drinking"
+      ],
+      "target": [
+        "What is he/she doing?",
+        "What are you doing?",
+        "He/She is jumping."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 4,
+      "title": "Community Service",
+      "topic": "Places & Community",
+      "sub": "Prepositions & Location",
+      "objective": "Students can demonstrate a functional understanding of 4 spatial prepositions and accurately answer simple \"Where is...?\" queries regarding localized objects.",
+      "vocab": [
+        "in",
+        "on",
+        "under",
+        "by (next to)"
+      ],
+      "target": [
+        "Where is the trash can?",
+        "It is under the tree."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 5,
+      "title": "Exploring the Community",
+      "topic": "Colors & Feelings",
+      "sub": "Feelings, States & Community Conditions",
+      "objective": "Students can communicate basic physiological states/feelings, ask/answer basic Yes/No questions regarding states, and describe the basic upkeep status of a public facility using basic adjectives.",
+      "vocab": [
+        "thirsty",
+        "hungry",
+        "full",
+        "tired",
+        "sad",
+        "happy",
+        "clean",
+        "dirty",
+        "safe"
+      ],
+      "target": [
+        "Are you thirsty?",
+        "Yes, I am.",
+        "No, I am not.",
+        "Is she/he thirsty?",
+        "Yes, he is.",
+        "No, he isn't.",
+        "The park is dirty."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 6,
+      "title": "Local Agricultural Specialties",
+      "topic": "Food & Drinks",
+      "sub": "Local Crops & Demonstratives",
+      "objective": "Students can name 8 localized agricultural crops, express basic eating preferences using \"I like...\", and correctly utilize proximity pointers (these vs. those).",
+      "vocab": [
+        "pineapples",
+        "peanuts",
+        "pomelos",
+        "oranges",
+        "tangerines",
+        "garlics",
+        "sweat potatoes",
+        "watermelons"
+      ],
+      "target": [
+        "I like pineapples.",
+        "What are these/those?"
+      ]
+    },
+    {
+      "g": 4,
+      "u": 7,
+      "title": "Food, Fun, and Recreation",
+      "topic": "Food & Drinks",
+      "sub": "Food, Beverages & Offers",
+      "objective": "Students can distinguish between common foods and beverages, communicate their likes, and properly accept or decline a culinary offering with appropriate courtesy phrases.",
+      "vocab": [
+        "hamburgers",
+        "hot dogs",
+        "sandwiches",
+        "fries",
+        "cakes",
+        "pizza",
+        "coke",
+        "milk",
+        "ice cream",
+        "fried chicken",
+        "juice",
+        "tea",
+        "water"
+      ],
+      "target": [
+        "I like pineapples.",
+        "What are these/those?",
+        "Do you want some tea?",
+        "Yes, I do.",
+        "No, I don't."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 8,
+      "title": "The Four Seasons of My Hometown",
+      "topic": "Weather & Seasons",
+      "sub": "Weather, Seasons & Preferences",
+      "objective": "Students can identify 6 types of weather and 4 seasons, characterize the relative climate temperature of each season, and articulate seasonal preferences.",
+      "vocab": [
+        "sunny",
+        "rainy",
+        "cloudy",
+        "windy",
+        "stormy",
+        "foggy",
+        "cool",
+        "hot",
+        "cold",
+        "warm",
+        "spring",
+        "summer",
+        "fall",
+        "winter"
+      ],
+      "target": [
+        "How's the weather?",
+        "It's sunny.",
+        "It's hot in summer.",
+        "Do you like spring?",
+        "Yes, I do.",
+        "No, I don't."
+      ]
+    },
+    {
+      "g": 4,
+      "u": 9,
+      "title": "Seasonal Feelings of My Hometown",
+      "topic": "Places & Community",
+      "sub": "Hometown, Seasons & Invitations",
+      "objective": "Students can integrate agricultural, seasonal, and locational elements to express affection for their hometown (Yunlin/Gukeng) and make simple invitations using \"Let’s go to...\".",
+      "vocab": [
+        "全 (all)"
+      ],
+      "target": [
+        "I like my hometown.",
+        "Winter is the season for oranges.",
+        "Do you want some orange juice?",
+        "Let's go to Gukeng."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 1,
+      "title": "Welcome to Yunlin",
+      "topic": "Places & Community",
+      "sub": "Yunlin Places & Days of the Week",
+      "objective": "Students can identify and say the days of the week, ask and answer “What day is today?”, and use simple sentences to talk about activities in Yunlin.",
+      "vocab": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+        "night market",
+        "museum",
+        "puppet show",
+        "temple",
+        "park",
+        "farm",
+        "bicycle",
+        "river",
+        "snacks",
+        "sightseeing"
+      ],
+      "target": [
+        "What day is today? It’s Friday.",
+        "You can go to the night market in Douliu on Saturday.",
+        "You can visit the puppet show museum on Monday.",
+        "You can go to the park.",
+        "You can ride a bicycle.",
+        "You can visit a temple."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 2,
+      "title": "Three Meals in Yunlin",
+      "topic": "Food & Drinks",
+      "sub": "Meals & Yunlin Food",
+      "objective": "Students can identify three meals of the day, name simple food in Yunlin, and talk about what they eat using “I eat ____.” and “You can eat _____.”",
+      "vocab": [
+        "breakfast",
+        "lunch",
+        "brunch",
+        "dinner",
+        "rice",
+        "noodles",
+        "bread",
+        "egg",
+        "milk",
+        "chicken",
+        "vegetables",
+        "fruit",
+        "soup",
+        "snack",
+        "night market food"
+      ],
+      "target": [
+        "I eat breakfast/lunch/dinner.",
+        "I eat rice/noodles.",
+        "You can eat noodles in Yunlin.",
+        "You can eat snacks at the night market.",
+        "What would you like for breakfast?",
+        "I would like some ______."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 3,
+      "title": "Living in Yunlin",
+      "topic": "Time & Daily Routines",
+      "sub": "Family & Daily Routines",
+      "objective": "Students can talk about family members, describe daily routines, ask and answer about daily schedules, and use simple present tense sentences about family life.",
+      "vocab": [
+        "family",
+        "grandfather",
+        "grandmother",
+        "father",
+        "mother",
+        "brother",
+        "sister",
+        "farmer",
+        "teacher",
+        "office",
+        "home",
+        "get up",
+        "have breakfast",
+        "go to work",
+        "take a nap",
+        "take a shower",
+        "eat dinner",
+        "go to bed"
+      ],
+      "target": [
+        "My grandfather is a farmer in ______.",
+        "My father works in _______.",
+        "My mother is a teacher.",
+        "We live in _______.",
+        "What time does your grandfather go to work?",
+        "He goes to work at 7 AM.",
+        "We eat dinner at 6 PM.",
+        "I go to bed at 9 PM."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 4,
+      "title": "Travel Plan",
+      "topic": "Travel & Transportation",
+      "sub": "Yunlin Landmarks & Travel Plans",
+      "objective": "Students can talk about places in Yunlin, ask and answer where someone is going, use “I am going to _____” and “He/She is going to ____”, and identify famous landmarks in Yunlin.",
+      "vocab": [
+        "Yunlin landmark",
+        "temple",
+        "theme park",
+        "museum",
+        "night market",
+        "Beigang",
+        "Gukeng",
+        "Chaotian Temple",
+        "Yunlin Story House",
+        "Honey Museum",
+        "Xiluo Bridge",
+        "Huwei Puppet Museum",
+        "Douliu Night Market",
+        "Nanguan Tourist Factory",
+        "Erlun Riverside Park",
+        "Janfusun Fancyworld",
+        "Yiwu Wetland"
+      ],
+      "target": [
+        "There are many temples in Yunlin.",
+        "There is one theme park in Gukeng.",
+        "Where are you going?",
+        "I am going to the theme park.",
+        "Where is he/she going?",
+        "He/She is going to Chaotian Temple.",
+        "Where is the Chaotian Temple?",
+        "It is in Beigang."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 5,
+      "title": "Marketing Yunlin / Yunlin Festivals",
+      "topic": "Festivals & Culture",
+      "sub": "Yunlin Festivals & Months",
+      "objective": "Students can identify important festivals in Yunlin, ask and answer about festival dates, use months of the year to describe events, and promote Yunlin festivals using simple sentences.",
+      "vocab": [
+        "coffee festival",
+        "sweet potato festival",
+        "lantern festival",
+        "藝閣",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ],
+      "target": [
+        "When is the Gukeng Coffee Festival? It is in March.",
+        "When is the Sweet Potato Festival? It is in October.",
+        "When is the Lantern Festival? It is in February.",
+        "The Coffee Festival is in Gukeng.",
+        "Yunlin has many festivals."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 6,
+      "title": "Welcome to Taiwan",
+      "topic": "Travel & Transportation",
+      "sub": "Transportation & Directions",
+      "objective": "Students can ask and answer about transportation in Taiwan, identify common transportation methods, give simple directions using “You can take…”, and describe locations using “Where is ____?” and “It is on ____ Road.”",
+      "vocab": [
+        "HSR",
+        "train",
+        "bus",
+        "MRT",
+        "scooter",
+        "bicycle",
+        "airplane",
+        "boat",
+        "taxi",
+        "car",
+        "motorcycle",
+        "subway",
+        "station",
+        "airport"
+      ],
+      "target": [
+        "How do I go to Taipei? You can take the HSR.",
+        "You can take the _____.",
+        "You can ride a ______.",
+        "You can take an airplane.",
+        "You can take a boat.",
+        "Where is ____?",
+        "It is on _____ Road.",
+        "It is in the city.",
+        "It is near the station."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 7,
+      "title": "Famous Landmarks in Taiwan",
+      "topic": "Travel & Transportation",
+      "sub": "Taiwan Landmarks & Directions",
+      "objective": "Students can identify famous places in Taiwan, ask and answer how to get to a place, give simple directions using “Go straight” and “Turn left/right,” and talk about their favorite places using simple sentences.",
+      "vocab": [
+        "famous landmark",
+        "Taipei 101",
+        "National Palace Museum",
+        "Chiang Kai-shek Memorial Hall",
+        "Sun Moon Lake",
+        "Alishan",
+        "Taroko Gorge",
+        "Raohe/Shilin Night Market",
+        "Yehliu Geopark",
+        "Jiufen Old Street"
+      ],
+      "target": [
+        "How can I get to Taipei 101?",
+        "Go straight and turn left.",
+        "Go straight and turn right.",
+        "Where is ____?",
+        "It is near _____.",
+        "My favorite place is _____."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 8,
+      "title": "Cultural Celebrations / Festivals in Taiwan",
+      "topic": "Festivals & Culture",
+      "sub": "Taiwan Festivals & Traditional Foods",
+      "objective": "Students can identify important festivals in Taiwan, ask and answer about festival dates, describe festivals using seasons and months, and talk about festival activities and traditional foods.",
+      "vocab": [
+        "Mazu Festival",
+        "Lantern Festival",
+        "Dragon Boat Festival",
+        "Mid-Autumn Festival",
+        "Chinese New Year",
+        "Double Ten Day",
+        "Ghost Festival",
+        "cultural festival",
+        "seasonal festival",
+        "celebration",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "mooncake",
+        "rice dumpling (zongzi)",
+        "tangyuan",
+        "fireworks",
+        "parade",
+        "family reunion"
+      ],
+      "target": [
+        "When is the Lantern Festival? It is in winter.",
+        "When is the Dragon Boat Festival? It is in summer.",
+        "People eat zongzi during the Dragon Boat Festival.",
+        "People eat mooncakes during the Mid-Autumn Festival.",
+        "People eat tangyuan during the Lantern Festival.",
+        "People have family reunions during Chinese New Year.",
+        "People watch fireworks during festivals."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 9,
+      "title": "Shopping in Taiwan",
+      "topic": "Shopping & Money",
+      "sub": "Prices, Money & Night Market Food",
+      "objective": "Students can ask and answer about prices, use “How much is/are ____?” in simple conversations, recognize and use basic money vocabulary in Taiwan, and describe prices using numbers in English.",
+      "vocab": [
+        "NT dollar",
+        "hundred",
+        "thousand",
+        "bubble tea",
+        "milk tea",
+        "oolong tea",
+        "pineapple cake",
+        "sun cake",
+        "mochi",
+        "beef noodle soup",
+        "stinky tofu",
+        "scallion pancake",
+        "fried chicken",
+        "dumplings",
+        "braised pork rice",
+        "oyster omelet",
+        "shaved ice",
+        "night market snacks",
+        "tea",
+        "drink",
+        "food",
+        "dessert"
+      ],
+      "target": [
+        "How much is this bubble tea? It is 50 NT dollars.",
+        "How much is this beef noodle soup? It is ____ NT dollars.",
+        "How much are these pineapple cakes? They are ____ NT dollars.",
+        "This is cheap.",
+        "This is expensive.",
+        "I want bubble tea.",
+        "I want pineapple cake.",
+        "Can I have ____?",
+        "I would like ____ please."
+      ]
+    },
+    {
+      "g": 5,
+      "u": 10,
+      "title": "Taiwan Industry",
+      "topic": "Work & Industry",
+      "sub": "Taiwan Products & Industries",
+      "objective": "Students can identify famous industries and products in Taiwan, describe what Taiwan is famous for, use simple sentences to talk about products and industries, and recognize products made in Taiwan.",
+      "vocab": [
+        "technology",
+        "computer",
+        "semiconductor",
+        "bicycle",
+        "tea",
+        "pineapple cake",
+        "bubble tea",
+        "electronics",
+        "factory",
+        "farmer",
+        "chips",
+        "scooter",
+        "machine",
+        "product",
+        "company",
+        "export"
+      ],
+      "target": [
+        "Taiwan is famous for semiconductors.",
+        "Taiwan is famous for bubble tea.",
+        "Taiwan is famous for bicycles.",
+        "Taiwan makes computers.",
+        "Taiwan is famous for tea.",
+        "This product is from Taiwan.",
+        "People work in factories.",
+        "Farmers grow tea and fruit."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 1,
+      "title": "Know The World",
+      "topic": "Countries & World",
+      "sub": "Countries & Identity",
+      "objective": "Students will be able to recognize and locate countries on a world map, ask and answer questions about where people are from using target sentence patterns, and communicate basic information about countries and identities through role-play activities.",
+      "vocab": [
+        "Asia",
+        "Europe",
+        "America",
+        "Africa"
+      ],
+      "target": [
+        "Where are you from?",
+        "Where is he/she from?",
+        "Are you from?",
+        "Is he/she from…"
+      ]
+    },
+    {
+      "g": 6,
+      "u": 2,
+      "title": "Tour Guide",
+      "topic": "Countries & World",
+      "sub": "Countries & Famous Food",
+      "objective": "Students will be able to identify and draw representative features of different countries and use the sentence pattern “___ is famous for ___” to introduce a country’s specialties.",
+      "vocab": [],
+      "target": [
+        "What is Taiwan famous for?",
+        "Japan is famous for sushi.",
+        "Taiwan is famous for xiao long bao.",
+        "Korea is famous for kimchi.",
+        "The USA is famous for burgers.",
+        "The UK is famous for fish and fries."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 3,
+      "title": "We Are Not the Same: Food",
+      "topic": "Food & Drinks",
+      "sub": "Food, Souvenirs & Travel",
+      "objective": "Students will be able to identify representative features of different places and countries and use the sentence pattern “___ is famous for ___” to introduce a country’s specialties.",
+      "vocab": [],
+      "target": [
+        "What would you like to have/buy in Taiwan?",
+        "I would like to have sushi in Japan.",
+        "I would like to have beef noodles in Taiwan.",
+        "I would like to buy pineapple cakes in Taiwan."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 4,
+      "title": "We Are Not the Same: Clothing",
+      "topic": "Clothing",
+      "sub": "Clothing, Weather & Countries",
+      "objective": "Students will be able to recognize and read vocabulary for countries and weather, match them with the correct clothing, and state appropriate clothing based on the weather and country using “People wear… in…”.",
+      "vocab": [
+        "jacket",
+        "sweater",
+        "boots",
+        "T-shirt",
+        "scarf",
+        "gloves",
+        "shorts",
+        "pants",
+        "dress"
+      ],
+      "target": [
+        "It's cold, what should I wear?",
+        "What do people wear in winter in Canada?",
+        "People wear boots and heavy coats."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 5,
+      "title": "World Attractions",
+      "topic": "Countries & World",
+      "sub": "Landmarks & Past Locations",
+      "objective": "Students will be able to identify tourist attractions and use past tense question-and-answer patterns, and identify sentence structures and write them in the past tense.",
+      "vocab": [],
+      "target": [
+        "Where were you yesterday?",
+        "Were you at Taipei 101 last weekend?",
+        "Yes, I was.",
+        "No, I wasn't.",
+        "Last week, last year, last month",
+        "Big Ben, Eiffel Tower, Pyramid"
+      ]
+    },
+    {
+      "g": 6,
+      "u": 6,
+      "title": "International Sporting Events",
+      "topic": "Sports & Free Time",
+      "sub": "Sports & Free Time",
+      "objective": "Students can use the sentence pattern “What do you do in your free time?” and answer the question properly.",
+      "vocab": [
+        "play basketball",
+        "play baseball",
+        "play badminton",
+        "play football",
+        "play tennis",
+        "go swimming",
+        "go biking",
+        "go jogging",
+        "Olympics",
+        "World Cup"
+      ],
+      "target": [
+        "What do you do in your free time?",
+        "I play basketball in my free time."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 7,
+      "title": "Keeping Up with the Social Trends",
+      "topic": "People & Media",
+      "sub": "Favorite People & Jobs",
+      "objective": "Students can use the sentence pattern “Who is your favorite singer/player/dancer …?” to describe their favorite people and jobs.",
+      "vocab": [
+        "singer",
+        "actor",
+        "group",
+        "idol",
+        "cook",
+        "dancer",
+        "Youtuber",
+        "Tiktoker",
+        "sports player"
+      ],
+      "target": [
+        "Who is your favorite singer?",
+        "My favorite singer is _____."
+      ]
+    },
+    {
+      "g": 6,
+      "u": 8,
+      "title": "An Interesting World",
+      "topic": "Countries & World",
+      "sub": "Countries, Languages & Greetings",
+      "objective": "Students can identify different countries and say “Hello” in different languages, and practice speaking about countries, languages, and greetings in a meaningful context.",
+      "vocab": [],
+      "target": [
+        "Where are you from?",
+        "I'm from the USA. I speak English. This is the way I say hello, \"Hello.\"",
+        "I'm from Japan. I speak Japanese. This is the way I say hello, \"Konichiwa.\"",
+        "I'm from Korea. I speak Korean. This is the way I say hello, \"An-nyeong-ha-se-yo.\"",
+        "I'm from Spain. I speak Spanish. This is the way I say hello, \"Hola.\""
+      ]
+    },
+    {
+      "g": 6,
+      "u": 9,
+      "title": "Let the Foreign Teachers Lead the Way",
+      "topic": "Travel & Transportation",
+      "sub": "Past Travel Experiences",
+      "objective": "Students can introduce/describe different places they have visited and describe their traveling experiences.",
+      "vocab": [],
+      "target": [
+        "Where did you go?",
+        "What were you doing?",
+        "How did you get there?",
+        "When did you go there?",
+        "Why did you go there?",
+        "Who were you with?",
+        "Did you sing / swim / dance / play soccer...?",
+        "Were you happy / tired / hungry / scared...?",
+        "Other questions (How many? How much? etc.)"
+      ]
+    },
+    {
+      "g": 6,
+      "u": 10,
+      "title": "Let’s Travel Around the World",
+      "topic": "Travel & Transportation",
+      "sub": "Travel Plans & World Landmarks",
+      "objective": "Students can identify different landmarks in different countries and describe their traveling plans.",
+      "vocab": [
+        "Big Ben",
+        "Eiffel Tower",
+        "Pyramid",
+        "…"
+      ],
+      "target": [
+        "I want to go to ______.",
+        "I would like to see ______.",
+        "Where do you want to go?",
+        "I want to go to Japan.",
+        "What would you like to see?",
+        "I would like to see Mt. Fuji."
+      ]
+    }
+  ]
+}

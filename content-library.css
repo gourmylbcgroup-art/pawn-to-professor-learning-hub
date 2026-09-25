@@ -1,0 +1,200 @@
+/* Pawn to Professor v1.7.0 — Dual Curriculum / Topic Library */
+
+.library-home-grid .menu-tile {
+  min-height: clamp(110px, 8vw, 160px);
+}
+
+.topic-package-list {
+  display:grid;
+  gap:.65em;
+  max-width:1000px;
+}
+
+.topic-package-card {
+  width:100%;
+  display:grid;
+  grid-template-columns:54px minmax(0,1fr) 28px;
+  align-items:center;
+  gap:.8em;
+  padding:.85em 1em;
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:16px;
+  color:var(--chalk);
+  background:rgba(255,255,255,.09);
+  text-align:left;
+  cursor:pointer;
+  box-shadow:0 5px 16px rgba(0,0,0,.12);
+}
+
+.topic-package-card:hover,
+.topic-package-card:focus-visible {
+  transform:translateY(-1px);
+  background:rgba(255,255,255,.14);
+  outline:none;
+}
+
+.topic-package-icon {
+  font-size:2em;
+}
+
+.topic-package-copy strong,
+.topic-package-copy small,
+.topic-package-copy span {
+  display:block;
+}
+
+.topic-package-copy strong {
+  font-family:var(--heading-font);
+  font-size:1.03em;
+}
+
+.topic-package-copy small {
+  color:var(--chalk);
+  margin-top:.12em;
+}
+
+.topic-package-copy span {
+  color:var(--chalk-soft);
+  font-size:.76em;
+  margin-top:.2em;
+}
+
+.topic-package-arrow {
+  font-size:2em;
+  opacity:.8;
+}
+
+/* Unit teaching dashboard */
+.unit-teaching-dashboard {
+  display:grid;
+  gap:.62em;
+  margin-bottom:.7em;
+}
+
+.unit-dashboard-title {
+  padding:.15em .1em .25em;
+}
+
+.unit-dashboard-title h2 {
+  margin:.08em 0;
+  font-family:var(--heading-font);
+  font-size:clamp(21px,1.7vw,34px);
+  line-height:1.06;
+}
+
+.unit-dashboard-title p {
+  margin:.15em 0 0;
+  color:var(--chalk-soft);
+  font-weight:800;
+}
+
+.unit-info-grid {
+  display:grid;
+  grid-template-columns:1.05fr 1fr 1.25fr;
+  gap:.58em;
+}
+
+.unit-info-card {
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:14px;
+  padding:.72em .8em;
+  background:rgba(255,255,255,.085);
+  min-height:118px;
+}
+
+.unit-info-card h3 {
+  margin:0 0 .36em;
+  font-family:var(--heading-font);
+  font-size:.95em;
+}
+
+.unit-info-card p {
+  margin:0;
+  line-height:1.42;
+  font-size:.78em;
+}
+
+.unit-info-card ul {
+  margin:.1em 0 0;
+  padding-left:1.15em;
+  font-size:.76em;
+  line-height:1.42;
+}
+
+.objective-card { background:rgba(144,202,249,.13); }
+.language-card { background:rgba(165,214,167,.12); }
+.vocabulary-card { background:rgba(255,224,130,.10); }
+
+.vocab-cloud {
+  display:flex;
+  flex-wrap:wrap;
+  gap:.28em;
+}
+
+.vocab-cloud span {
+  display:inline-flex;
+  padding:.22em .48em;
+  border-radius:999px;
+  background:rgba(255,255,255,.13);
+  border:1px solid rgba(255,255,255,.13);
+  font-size:.70em;
+  line-height:1.2;
+}
+
+.unit-empty-copy {
+  opacity:.8;
+  font-style:italic;
+}
+
+.unit-material-section {
+  margin:.68em 0;
+}
+
+.unit-material-section .section-heading {
+  margin:.1em 0 .38em;
+  font-size:1em;
+}
+
+.unit-resource-kind {
+  font-size:.68em;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:var(--chalk-soft);
+  margin-bottom:.15em;
+}
+
+.interactive-lesson-card {
+  border-color:rgba(120,224,190,.40);
+  background:rgba(67,190,149,.13);
+}
+
+.unit-resource-card {
+  min-height:100px;
+}
+
+.unit-no-materials {
+  height:130px;
+  margin-top:.6em;
+}
+
+@media (max-width:1100px) {
+  .unit-info-grid {
+    grid-template-columns:1fr 1fr;
+  }
+  .vocabulary-card {
+    grid-column:1 / -1;
+  }
+}
+
+@media (max-width:760px) {
+  .unit-info-grid {
+    grid-template-columns:1fr;
+  }
+  .vocabulary-card {
+    grid-column:auto;
+  }
+  .topic-package-card {
+    grid-template-columns:42px minmax(0,1fr) 20px;
+  }
+}
