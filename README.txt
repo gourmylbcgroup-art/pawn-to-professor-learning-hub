@@ -1,22 +1,28 @@
-Pawn to Professor v1.9.5 — Admin Cleanup Center
+Pawn to Professor v1.9.6
+PRIVATE MAILBOX + WELCOME + TRIAL/ACCESS CONTACT
+
+RUN SQL FIRST:
+supabase/v1.9.6-private-mailbox.sql
 
 ADD:
-- admin-cleanup.js
-- admin-cleanup.css
-- api/admin/cleanup.js
+- member-mailbox.js
+- mailbox.css
+- api/support/message.js
+- api/admin/approve-registration.js
+- supabase/v1.9.6-private-mailbox.sql
 
 REPLACE:
 - index.html
 
-NO SQL REQUIRED.
-
 Features:
-- permanently delete rejected registrations and free username/email
-- archive/restore/permanently delete activities
-- archive/restore/permanently delete resources
-- Owner-only hidden Unit permanent deletion with impact preview
-- Audit JSON export
-- Owner-only audit retention purge
-- legal consent records remain protected
+- My Messages for Teacher/Learner
+- Admin Messages inbox + unread count
+- Admin emails on member message
+- member email on Admin reply
+- automatic private welcome after approval
+- editable Teacher/Learner welcome templates
+- locked-content access/payment prompt
+- trial-ended Contact Admin flow
+- workflow: New / Awaiting Payment / Payment Received / Access Granted / Closed
 
-Read SETUP-v1.9.5.md before installation.
+Read SETUP-v1.9.6.md before installing.
