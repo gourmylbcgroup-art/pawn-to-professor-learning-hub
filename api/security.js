@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 import { emailConfigured, sendEmail } from './_lib/email.js';
+import { handleSupportMessage, handleApproveRegistration } from './_lib/mailbox-actions.js';
 import {
   json,
   getAuthenticatedProfile,
@@ -443,6 +444,10 @@ export default async function handler(req, res) {
       return requestPasswordReset({ req, res, admin });
     case 'reset-password':
       return resetPassword({ req, res, admin });
+    case 'support-message':
+      return handleSupportMessage({ req, res, admin });
+    case 'approve-registration':
+      return handleApproveRegistration({ req, res, admin });
     default:
       return json(res, 404, { error: 'Unknown security action.' });
   }
