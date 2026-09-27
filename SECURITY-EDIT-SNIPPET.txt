@@ -1,0 +1,10 @@
+// v1.9.6a — api/security.js manual edits
+
+// 1) Add this import near the top:
+import { handleSupportMessage, handleApproveRegistration } from './_lib/mailbox-actions.js';
+
+// 2) Add these TWO cases inside the existing switch(action):
+case 'support-message':
+  return handleSupportMessage({ req, res, admin });
+case 'approve-registration':
+  return handleApproveRegistration({ req, res, admin });

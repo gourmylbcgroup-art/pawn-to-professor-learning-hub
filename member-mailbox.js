@@ -63,7 +63,7 @@
 
   async function api(payload) {
     const headers = await authHeaders();
-    const res = await fetch('/api/support/message', {
+    const res = await fetch('/api/security?action=support-message', {
       method: 'POST',
       headers,
       cache: 'no-store',
@@ -876,7 +876,7 @@
 
           try {
             const headers = await authHeaders();
-            const res = await fetch('/api/admin/approve-registration', {
+            const res = await fetch('/api/security?action=approve-registration', {
               method:'POST',
               headers,
               cache:'no-store',

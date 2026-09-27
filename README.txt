@@ -1,28 +1,24 @@
-Pawn to Professor v1.9.6
-PRIVATE MAILBOX + WELCOME + TRIAL/ACCESS CONTACT
+Pawn to Professor v1.9.6a
+VERCEL FREE 12-FUNCTION FIX
 
-RUN SQL FIRST:
-supabase/v1.9.6-private-mailbox.sql
+NO SQL.
 
 ADD:
-- member-mailbox.js
-- mailbox.css
-- api/support/message.js
-- api/admin/approve-registration.js
-- supabase/v1.9.6-private-mailbox.sql
+- api/_lib/mailbox-actions.js
 
 REPLACE:
-- index.html
+- member-mailbox.js
 
-Features:
-- My Messages for Teacher/Learner
-- Admin Messages inbox + unread count
-- Admin emails on member message
-- member email on Admin reply
-- automatic private welcome after approval
-- editable Teacher/Learner welcome templates
-- locked-content access/payment prompt
-- trial-ended Contact Admin flow
-- workflow: New / Awaiting Payment / Payment Received / Access Granted / Closed
+EDIT:
+- api/security.js
+  Add one import + two switch cases.
+  Exact snippet is in SECURITY-EDIT-SNIPPET.txt.
 
-Read SETUP-v1.9.6.md before installing.
+DELETE:
+- api/support/message.js
+- api/admin/approve-registration.js
+
+Result:
+14 API endpoint files -> 12 API endpoint files.
+
+All v1.9.6 mailbox, welcome, trial, email and access-contact features remain.
