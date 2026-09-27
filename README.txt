@@ -1,15 +1,22 @@
-Pawn to Professor v1.9.4
+Pawn to Professor v1.9.5 — Admin Cleanup Center
 
-NEW REGISTRATION ADMIN EMAIL
+ADD:
+- admin-cleanup.js
+- admin-cleanup.css
+- api/admin/cleanup.js
 
-Recipients:
-- stephane@alphagenus.com (always)
-- all active Admins with valid contact_email
-- all active Owners with valid contact_email
+REPLACE:
+- index.html
 
-Files:
-- api/register-request.js   REPLACE
-- supabase/v1.9.4-registration-admin-email.sql   RUN + optionally store in GitHub
-- SETUP-v1.9.4.md
+NO SQL REQUIRED.
 
-Registration is never cancelled if email delivery fails.
+Features:
+- permanently delete rejected registrations and free username/email
+- archive/restore/permanently delete activities
+- archive/restore/permanently delete resources
+- Owner-only hidden Unit permanent deletion with impact preview
+- Audit JSON export
+- Owner-only audit retention purge
+- legal consent records remain protected
+
+Read SETUP-v1.9.5.md before installation.

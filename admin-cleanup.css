@@ -1,0 +1,151 @@
+/* Pawn to Professor v1.9.5 — Admin Cleanup Center */
+
+.cleanup-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: .45em;
+  align-items: end;
+  margin: .65em 0;
+}
+
+.cleanup-toolbar input,
+.cleanup-toolbar select {
+  margin: 0;
+}
+
+.cleanup-section {
+  margin: .8em 0;
+  padding: .75em;
+  border: 1px solid var(--board-line);
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+}
+
+.cleanup-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .5em;
+  margin-bottom: .55em;
+}
+
+.cleanup-section h3 {
+  margin: 0 0 .15em !important;
+}
+
+.cleanup-section .admin-note {
+  margin: 0;
+}
+
+.cleanup-list {
+  display: grid;
+  gap: .4em;
+}
+
+.cleanup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .7em;
+  padding: .65em .7em;
+  border: 1px solid var(--board-line);
+  border-radius: 11px;
+  background: rgba(255,255,255,.07);
+}
+
+.cleanup-row > div:first-child {
+  min-width: 0;
+}
+
+.cleanup-row strong,
+.cleanup-row .meta,
+.cleanup-row small {
+  overflow-wrap: anywhere;
+}
+
+.cleanup-row small {
+  color: var(--chalk-soft);
+}
+
+.cleanup-row .actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .35em;
+  flex-wrap: wrap;
+}
+
+.cleanup-archived {
+  border-style: dashed;
+  background: rgba(255,255,255,.035);
+}
+
+.cleanup-danger-section {
+  border-color: rgba(248,113,113,.45);
+  background: rgba(127,29,29,.08);
+}
+
+.cleanup-danger-row {
+  border-color: rgba(248,113,113,.35);
+}
+
+.cleanup-owner-only {
+  display: inline-flex;
+  align-items: center;
+  padding: .35em .6em;
+  border-radius: 999px;
+  border: 1px solid var(--board-line);
+  color: var(--chalk-soft);
+  font-size: .72em;
+  font-weight: 800;
+}
+
+.cleanup-audit-controls {
+  display: flex;
+  align-items: end;
+  gap: .5em;
+  flex-wrap: wrap;
+}
+
+.cleanup-audit-controls label {
+  min-width: 160px;
+}
+
+.cleanup-audit-controls select {
+  width: 100%;
+}
+
+html[data-device-layout="tablet"] .cleanup-toolbar {
+  grid-template-columns: minmax(0,1fr) auto;
+}
+
+html[data-device-layout="tablet"] .cleanup-toolbar #cleanupRefresh {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+html[data-device-layout="mobile"] .cleanup-toolbar {
+  grid-template-columns: 1fr;
+}
+
+html[data-device-layout="mobile"] .cleanup-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+html[data-device-layout="mobile"] .cleanup-row .actions {
+  justify-content: stretch;
+}
+
+html[data-device-layout="mobile"] .cleanup-row .actions .btn {
+  flex: 1 1 100%;
+}
+
+html[data-device-layout="mobile"] .cleanup-audit-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+html[data-device-layout="mobile"] .cleanup-audit-controls .btn {
+  width: 100%;
+}
