@@ -1,0 +1,50 @@
+/* Pawn to Professor v1.8.0 — Teacher/Learner + Trial */
+.v18-registration-fields {
+  display:grid;
+  gap:.72em;
+  margin:.2em 0 .7em;
+}
+.v18-field-title { font-weight:900; margin-bottom:.35em; }
+.v18-choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:.55em; }
+.v18-choice-card {
+  display:flex; gap:.55em; align-items:flex-start; cursor:pointer;
+  padding:.65em .7em; border-radius:14px;
+  border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.07);
+}
+.v18-choice-card input { margin-top:.22em; width:auto; }
+.v18-choice-card strong,.v18-choice-card small { display:block; }
+.v18-choice-card small { margin-top:.12em; opacity:.82; line-height:1.28; }
+.v18-age-block,.v18-guardian-fields { display:grid; gap:.55em; }
+.v18-checkbox { align-items:flex-start; }
+.v18-checkbox input { width:auto; margin-top:.15em; }
+.v18-trial-note {
+  display:grid; gap:.15em; padding:.65em .75em; border-radius:13px;
+  background:rgba(117,224,179,.11); border:1px solid rgba(117,224,179,.3);
+  font-size:.88em;
+}
+.v18-trial-note span { opacity:.86; line-height:1.35; }
+.v18-trial-banner {
+  display:grid; grid-template-columns:auto 1fr; gap:.7em; align-items:center;
+  padding:.7em .85em; margin:0 0 .7em; border-radius:15px;
+  border:1px solid rgba(255,255,255,.24); box-shadow:0 5px 16px rgba(0,0,0,.12);
+}
+.v18-trial-banner.active { background:rgba(117,224,179,.14); }
+.v18-trial-banner.expired { background:rgba(255,208,74,.11); }
+.v18-trial-banner strong,.v18-trial-banner span { display:block; }
+.v18-trial-banner span { margin-top:.12em; opacity:.86; font-size:.84em; }
+.v18-trial-icon { font-size:1.55em; }
+.v18-request-meta {
+  display:grid; gap:.12em; padding:.5em .6em; margin-top:.45em;
+  border-radius:10px; background:rgba(255,255,255,.06); font-size:.84em;
+}
+.v18-request-meta span { opacity:.86; }
+.v18-admin-trial-card {
+  display:grid; gap:.34em; padding:.68em .78em; margin:.65em 0;
+  border-radius:13px; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.07);
+}
+.v18-admin-trial-card > div { display:flex; justify-content:space-between; gap:1em; font-size:.84em; }
+.v18-admin-trial-card > div span { opacity:.78; }
+.v18-admin-trial-card p { margin:.15em 0 0; font-size:.78em; opacity:.78; }
+.v18-admin-trial-card.active { border-color:rgba(117,224,179,.38); }
+.v18-admin-trial-card.expired { border-color:rgba(255,208,74,.32); }
+@media (max-width:700px){ .v18-choice-grid{grid-template-columns:1fr;} }
