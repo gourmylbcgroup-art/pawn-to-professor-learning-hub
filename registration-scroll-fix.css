@@ -1,0 +1,108 @@
+/* Pawn to Professor v1.9.4a — Registration Scroll Fix
+   ---------------------------------------------------
+   The registration form became taller after Teacher/Learner + Terms/Privacy
+   were added. On desktop the chalkboard is a fixed-height area and the board
+   shell intentionally hides overflow, so the bottom of the form could be
+   clipped and impossible to reach.
+
+   Fix:
+   - Desktop: keep the left "Request Access" branding stationary.
+   - Make ONLY the registration card on the right independently scrollable.
+   - Tablet/mobile keep their existing responsive page scrolling.
+*/
+
+html[data-device-layout="desktop"] #registerView {
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+html[data-device-layout="desktop"] #registerView > .brand {
+  align-self: center;
+  min-width: 0;
+}
+
+html[data-device-layout="desktop"] #registerView .register-card {
+  align-self: stretch;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: max(5%, 14px);
+  padding-bottom: max(5%, 18px);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Make the internal scrollbar easy to see against the green board. */
+html[data-device-layout="desktop"] #registerView .register-card {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.55) rgba(255,255,255,.08);
+}
+
+html[data-device-layout="desktop"] #registerView .register-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+html[data-device-layout="desktop"] #registerView .register-card::-webkit-scrollbar-track {
+  background: rgba(255,255,255,.08);
+  border-radius: 999px;
+}
+
+html[data-device-layout="desktop"] #registerView .register-card::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.48);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Keep the last controls comfortably reachable. */
+html[data-device-layout="desktop"] #registerView .form-message {
+  margin-bottom: 8px;
+}
+
+/* Tablet/iPad: the entire registration view already scrolls.
+   Explicitly preserve that behavior. */
+html[data-device-layout="tablet"] #registerView {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-content: start;
+}
+
+html[data-device-layout="tablet"] #registerView .register-card {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Mobile: full-screen single-column registration continues to scroll normally. */
+html[data-device-layout="mobile"] #registerView {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+html[data-device-layout="mobile"] #registerView .register-card {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Width-based fallback if the device detector has not run yet. */
+@media (min-width: 1100px) {
+  html:not([data-device-layout]) #registerView {
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  html:not([data-device-layout]) #registerView > .brand {
+    align-self: center;
+  }
+
+  html:not([data-device-layout]) #registerView .register-card {
+    align-self: stretch;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
