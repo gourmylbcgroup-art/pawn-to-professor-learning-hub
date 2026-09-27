@@ -1,18 +1,13 @@
-Pawn to Professor Learning Hub v1.6.2
-Consolidated Security API
+Pawn to Professor v1.9.3a — Legal Admin Fix
 
-FILES TO ADD/REPLACE:
-- api/security.js                    ADD
-- vercel.json                        REPLACE
+ADD:
+- legal-admin-fix.js
 
-FILES TO DELETE:
-- api/security/check-device.js
-- api/security/verify-device.js
-- api/security/session-status.js
-- api/security/request-password-reset.js
-- api/security/reset-password.js
+REPLACE:
+- index.html
 
-NO SQL TO RUN.
-NO FRONTEND FILES TO REPLACE.
+NO SQL.
 
-Read SETUP-v1.6.2.md before installing.
+Then wait for Vercel Ready and hard refresh.
+
+See SETUP-v1.9.3a.txt for exact steps.

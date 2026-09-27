@@ -1,0 +1,143 @@
+Pawn to Professor — v1.9.3a Legal Admin Fix
+===============================================
+
+PURPOSE
+-------
+Fix the missing:
+
+⚖️ Legal & Registration
+
+button in Admin.
+
+This is a WEBSITE-ONLY patch.
+
+DO NOT RUN SQL.
+DO NOT CHANGE SUPABASE.
+DO NOT REPLACE app.js.
+DO NOT REPLACE legal.js.
+
+WHAT THIS PATCH DOES
+--------------------
+It adds one final compatibility file:
+
+legal-admin-fix.js
+
+This file loads LAST and guarantees that the Admin menu contains:
+
+⚖️ Legal & Registration
+
+It also directly renders the editable legal editor, so it does not depend on
+the older dynamic Admin-tab insertion working correctly.
+
+The four existing legal documents remain:
+
+- Common Terms of Use
+- Teacher Terms of Use
+- Learner Terms of Use
+- Privacy Policy
+
+Existing database legal versions and consent records are NOT changed.
+
+INSTALLATION — STEP BY STEP
+---------------------------
+
+STEP 1
+Open your GitHub repository:
+
+pawn-to-professor-learning-hub
+
+STEP 2
+Upload / ADD this new file:
+
+legal-admin-fix.js
+
+Put it in the ROOT of the repository, beside:
+
+app.js
+legal.js
+member-trial.js
+index.html
+
+STEP 3
+REPLACE your current:
+
+index.html
+
+with the index.html included in this patch.
+
+IMPORTANT:
+Do not replace app.js.
+Do not replace legal.js.
+Do not run SQL.
+
+STEP 4
+Commit the two file changes.
+
+Suggested commit message:
+
+v1.9.3a fix Legal Registration admin menu
+
+STEP 5
+Open Vercel.
+
+Wait until the new Production deployment says:
+
+Ready
+
+STEP 6
+Hard-refresh the website.
+
+Mac / Chrome:
+Command + Shift + R
+
+Windows:
+Ctrl + F5
+
+STEP 7
+Login as Admin / Owner.
+
+Press:
+
+Admin
+
+Scroll to the bottom of the Admin menu.
+
+You should now see:
+
+🧾 Audit Log
+⚖️ Legal & Registration
+
+STEP 8
+Press:
+
+⚖️ Legal & Registration
+
+You should see:
+
+Common Terms of Use
+Teacher Terms of Use
+Learner Terms of Use
+Privacy Policy
+
+Each document should have:
+
+Preview
+Save Draft
+Publish New Version
+
+NO DATABASE CHANGE
+------------------
+This patch does NOT change:
+
+- users
+- Teacher / Learner accounts
+- 7-day trial
+- Unit access
+- Browse by Topic
+- Community permissions
+- games
+- resources
+- email
+- device security
+- legal SQL
+- legal consent records
