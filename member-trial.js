@@ -1,11 +1,11 @@
-/* Pawn to Professor v1.8.0
+/* Pawn to Professor v1.9.0
    Teacher / Learner registration + 7-day Unit 1 trial experience.
    This file is intentionally additive so the existing v1.7 site stays intact.
 */
 (() => {
   if (typeof state === 'undefined' || typeof els === 'undefined') return;
 
-  const V18 = '1.8.0';
+  const V18 = '1.9.0';
 
   function esc(v = '') {
     if (typeof escapeHtml === 'function') return escapeHtml(v);
@@ -85,14 +85,16 @@
         </div>
         <label class="checkbox-card v18-checkbox">
           <input id="v18GuardianConsent" type="checkbox">
-          I confirm that my parent or legal guardian has given permission for this account.
+          I confirm that I am the parent/legal guardian, or that my parent/legal guardian has given permission for this learner account.
         </label>
       </div>
 
-      <label class="checkbox-card v18-checkbox v18-terms">
-        <input id="v18TermsAccepted" type="checkbox">
-        I agree to the Terms of Use and Privacy Policy.
-      </label>
+      <div>
+        <div class="v18-field-title">Terms & Privacy</div>
+        <div id="v19LegalChecks" class="v19-legal-checks">
+          <div class="v19-legal-status">Loading the current agreements…</div>
+        </div>
+      </div>
 
       <div class="v18-trial-note">
         <strong>🎁 7-day trial after approval</strong>
@@ -111,10 +113,57 @@
     const guardianName = block.querySelector('#v18GuardianName');
     const guardianEmail = block.querySelector('#v18GuardianEmail');
     const guardianConsent = block.querySelector('#v18GuardianConsent');
+    const legalChecks = block.querySelector('#v19LegalChecks');
+    let currentLegalDocs = [];
+
+    function currentType() {
+      return block.querySelector('input[name="v18MemberType"]:checked')?.value || 'teacher';
+    }
+
+    function isMinorLearner() {
+      return currentType()==='learner' && learnerAgeSelect.value==='minor';
+    }
+
+    async function renderLegalChecks() {
+      const type=currentType();
+      legalChecks.innerHTML='<div class="v19-legal-status">Loading the current agreements…</div>';
+      try {
+        if(!globalThis.PTPLegal) throw new Error('Legal module is not loaded.');
+        currentLegalDocs=await globalThis.PTPLegal.requiredDocuments(type);
+        const needed=globalThis.PTPLegal.requiredTypes(type);
+        const missing=needed.filter(t=>!currentLegalDocs.some(d=>d.document_type===t));
+        if(missing.length) {
+          legalChecks.innerHTML='<div class="v19-legal-warning">Registration is temporarily unavailable because the current legal documents are incomplete. Please contact the administrator.</div>';
+          return;
+        }
+
+        const guardian=isMinorLearner();
+        legalChecks.innerHTML=currentLegalDocs.map(doc=>{
+          const privacy=doc.document_type==='privacy_policy';
+          const name=globalThis.PTPLegal.types[doc.document_type]||doc.title;
+          const sentence=guardian
+            ? (privacy
+                ? `My parent/legal guardian acknowledges the ${name} on my behalf.`
+                : `My parent/legal guardian agrees to the ${name} on my behalf.`)
+            : (privacy ? `I acknowledge the ${name}.` : `I agree to the ${name}.`);
+          return `
+            <label class="v19-legal-check">
+              <input type="checkbox" data-legal-accept="${doc.id}" data-legal-type="${doc.document_type}">
+              <span>${esc(sentence)} <small>(v${esc(doc.version)})</small></span>
+              <button type="button" data-view-legal="${doc.document_type}">View</button>
+            </label>`;
+        }).join('');
+        legalChecks.querySelectorAll('[data-view-legal]').forEach(btn=>btn.addEventListener('click',()=>{
+          const doc=currentLegalDocs.find(d=>d.document_type===btn.dataset.viewLegal);
+          globalThis.PTPLegal.openDocument(doc);
+        }));
+      } catch(err) {
+        legalChecks.innerHTML=`<div class="v19-legal-warning">${esc(err.message||'Could not load the current agreements.')}</div>`;
+      }
+    }
 
     function syncRegistrationType() {
-      const type = block.querySelector('input[name="v18MemberType"]:checked')?.value || 'teacher';
-      const learner = type === 'learner';
+      const learner = currentType() === 'learner';
       teacherAge.classList.toggle('hidden', learner);
       learnerAge.classList.toggle('hidden', !learner);
       if (!learner) {
@@ -124,6 +173,7 @@
         guardianEmail.required = false;
         guardianConsent.required = false;
       }
+      renderLegalChecks();
     }
 
     function syncGuardianFields() {
@@ -132,6 +182,7 @@
       guardianName.required = showGuardian;
       guardianEmail.required = showGuardian;
       guardianConsent.required = showGuardian;
+      renderLegalChecks();
     }
 
     block.querySelectorAll('input[name="v18MemberType"]').forEach(r => r.addEventListener('change', syncRegistrationType));
@@ -139,8 +190,8 @@
     syncRegistrationType();
     syncGuardianFields();
 
-    // Capture phase prevents the older v1.7 registration listener from sending
-    // a request without the new member/age fields.
+    // Capture phase prevents the older core registration listener from sending
+    // a request without the new member/age/legal fields.
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -151,17 +202,11 @@
         return;
       }
 
-      const memberType = block.querySelector('input[name="v18MemberType"]:checked')?.value || 'teacher';
-      const termsAccepted = block.querySelector('#v18TermsAccepted').checked;
+      const memberType = currentType();
       let adultConfirmed = false;
       let guardianNameValue = '';
       let guardianEmailValue = '';
       let guardianConsentValue = false;
-
-      if (!termsAccepted) {
-        els.registerMessage.textContent = 'Please accept the Terms of Use and Privacy Policy.';
-        return;
-      }
 
       if (memberType === 'teacher') {
         adultConfirmed = block.querySelector('#v18TeacherAdult').checked;
@@ -187,6 +232,28 @@
         }
       }
 
+      // Refresh legal versions immediately before submission so a newly
+      // published version cannot be silently bypassed.
+      try {
+        globalThis.PTPLegal?.clearCache?.();
+        currentLegalDocs = await globalThis.PTPLegal.requiredDocuments(memberType);
+      } catch(err) {
+        els.registerMessage.textContent = err.message || 'Could not verify the current Terms.';
+        return;
+      }
+
+      const requiredTypes=globalThis.PTPLegal.requiredTypes(memberType);
+      const acceptedBoxes=[...legalChecks.querySelectorAll('[data-legal-accept]:checked')];
+      const acceptedIds=acceptedBoxes.map(x=>x.dataset.legalAccept);
+      const acceptedTypes=new Set(acceptedBoxes.map(x=>x.dataset.legalType));
+
+      if(requiredTypes.some(t=>!acceptedTypes.has(t))) {
+        // Re-render because the current legal versions may have changed.
+        await renderLegalChecks();
+        els.registerMessage.textContent = 'Please review and accept all required Terms and the Privacy Policy.';
+        return;
+      }
+
       els.registerMessage.textContent = 'Sending request…';
       try {
         const res = await fetch('/api/register-request', {
@@ -202,12 +269,13 @@
             guardianName:guardianNameValue,
             guardianEmail:guardianEmailValue,
             guardianConsent:guardianConsentValue,
-            termsAccepted:true
+            acceptedDocumentIds:acceptedIds
           })
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
           els.registerMessage.textContent = body.error || 'Registration could not be completed.';
+          if(res.status===409) renderLegalChecks();
           return;
         }
         form.reset();

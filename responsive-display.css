@@ -1,0 +1,902 @@
+/* Pawn to Professor v1.9.1 — Responsive Display
+   ------------------------------------------------------------
+   One website, three automatic display modes:
+     desktop  = current classroom layout
+     tablet   = touch-friendly iPad/tablet workspace
+     mobile   = full-screen single-column learning workspace
+
+   This stylesheet is intentionally loaded LAST.
+*/
+
+/* ------------------------------------------------------------
+   Shared responsive safety
+   ------------------------------------------------------------ */
+html,
+body {
+  max-width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
+
+.content-area,
+.admin-panel,
+.admin-sidebar,
+.login-card {
+  -webkit-overflow-scrolling: touch;
+}
+
+html[data-device-layout="tablet"] *,
+html[data-device-layout="mobile"] * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Make touch targets practical without changing desktop sizing. */
+html[data-device-layout="tablet"] .btn,
+html[data-device-layout="mobile"] .btn,
+html[data-device-layout="tablet"] .menu-tile,
+html[data-device-layout="mobile"] .menu-tile,
+html[data-device-layout="tablet"] .topic-package-card,
+html[data-device-layout="mobile"] .topic-package-card {
+  min-height: 44px;
+}
+
+/* ------------------------------------------------------------
+   DESKTOP / COMPUTER
+   ------------------------------------------------------------
+   Deliberately minimal. Existing desktop layout remains intact.
+*/
+html[data-device-layout="desktop"] .scene {
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------
+   TABLET / IPAD
+   ------------------------------------------------------------ */
+html[data-device-layout="tablet"] body {
+  min-height: 100dvh;
+  display: block;
+  overflow: hidden;
+}
+
+html[data-device-layout="tablet"] .scene {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  background-position: center center !important;
+  background-size: cover !important;
+  overflow: hidden;
+}
+
+html[data-device-layout="tablet"] .board-shell,
+html[data-device-layout="tablet"] .scene.portal-mode .board-shell {
+  position: absolute;
+  left: 3.2% !important;
+  top: 3.2% !important;
+  width: 93.6% !important;
+  height: 93.6% !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(rgba(3, 52, 39, .92), rgba(3, 43, 33, .95));
+  border: 1px solid rgba(255,255,255,.22);
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+
+html[data-device-layout="tablet"] .view,
+html[data-device-layout="tablet"] .scene.portal-mode #portalView {
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(22px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(22px, env(safe-area-inset-left)) !important;
+}
+
+html[data-device-layout="tablet"] #loginView,
+html[data-device-layout="tablet"] #registerView,
+html[data-device-layout="tablet"] #deviceVerifyView {
+  overflow: auto;
+  align-content: center;
+}
+
+html[data-device-layout="tablet"][data-device-orientation="portrait"] #loginView,
+html[data-device-layout="tablet"][data-device-orientation="portrait"] #registerView,
+html[data-device-layout="tablet"][data-device-orientation="portrait"] #deviceVerifyView {
+  grid-template-columns: 1fr;
+  gap: 22px;
+  align-content: start;
+}
+
+html[data-device-layout="tablet"][data-device-orientation="portrait"] .brand {
+  max-width: 680px;
+}
+
+html[data-device-layout="tablet"] .brand-kicker {
+  font-size: 14px !important;
+}
+
+html[data-device-layout="tablet"] .brand h1 {
+  font-size: clamp(34px, 5.5vw, 54px);
+}
+
+html[data-device-layout="tablet"] .brand p {
+  font-size: 17px;
+}
+
+html[data-device-layout="tablet"] .login-card {
+  padding: 22px;
+  border-radius: 20px;
+}
+
+html[data-device-layout="tablet"] .login-card label {
+  font-size: 15px;
+}
+
+html[data-device-layout="tablet"] .login-card input,
+html[data-device-layout="tablet"] .login-card select,
+html[data-device-layout="tablet"] .admin-panel input,
+html[data-device-layout="tablet"] .admin-panel select,
+html[data-device-layout="tablet"] .admin-panel textarea {
+  min-height: 46px;
+  font-size: 16px;
+}
+
+html[data-device-layout="tablet"] #portalView {
+  overflow: hidden;
+}
+
+html[data-device-layout="tablet"] .board-header {
+  gap: 12px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .board-header h1 {
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .brand-kicker {
+  font-size: 13px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .header-actions .btn {
+  min-height: 44px;
+  font-size: 14px;
+  padding: .7em 1em;
+}
+
+html[data-device-layout="tablet"] .breadcrumb {
+  font-size: 13px !important;
+  margin: 7px 0 10px !important;
+}
+
+html[data-device-layout="tablet"] .content-area {
+  overflow: auto;
+  padding: 2px 4px 18px 0;
+}
+
+/* Tablet cards = 2 columns */
+html[data-device-layout="tablet"] .scene.portal-mode .tile-grid,
+html[data-device-layout="tablet"] html[data-menu-style="large"] .tile-grid,
+html[data-device-layout="tablet"] html[data-menu-style="compact"] .tile-grid,
+html[data-device-layout="tablet"] .activity-list,
+html[data-device-layout="tablet"] .tool-list,
+html[data-device-layout="tablet"] .resource-list,
+html[data-device-layout="tablet"] .community-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  width: 100% !important;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .tile-grid:not(:has(.menu-tile:nth-child(3))) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .menu-tile {
+  min-height: 118px;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .tile-icon {
+  font-size: 34px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .tile-title {
+  font-size: 21px;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .tile-subtitle {
+  font-size: 14px;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .activity-card,
+html[data-device-layout="tablet"] .scene.portal-mode .tool-card,
+html[data-device-layout="tablet"] .resource-card {
+  min-height: 120px;
+  padding: 16px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .activity-card h3,
+html[data-device-layout="tablet"] .scene.portal-mode .tool-card h3,
+html[data-device-layout="tablet"] .resource-body h3 {
+  font-size: 18px;
+}
+
+html[data-device-layout="tablet"] .scene.portal-mode .activity-card p,
+html[data-device-layout="tablet"] .scene.portal-mode .tool-card p,
+html[data-device-layout="tablet"] .resource-body p {
+  font-size: 14px;
+}
+
+/* Unit information = 2 + full-width vocabulary */
+html[data-device-layout="tablet"] .unit-info-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px;
+}
+
+html[data-device-layout="tablet"] .vocabulary-card {
+  grid-column: 1 / -1 !important;
+}
+
+html[data-device-layout="tablet"] .unit-info-card {
+  min-height: 130px;
+  padding: 15px;
+}
+
+html[data-device-layout="tablet"] .unit-info-card h3 {
+  font-size: 17px;
+}
+
+html[data-device-layout="tablet"] .unit-info-card p,
+html[data-device-layout="tablet"] .unit-info-card ul {
+  font-size: 14px;
+}
+
+html[data-device-layout="tablet"] .vocab-cloud span {
+  font-size: 13px;
+  padding: .35em .62em;
+}
+
+html[data-device-layout="tablet"] .topic-package-list {
+  max-width: none;
+}
+
+html[data-device-layout="tablet"] .topic-package-card {
+  grid-template-columns: 50px minmax(0,1fr) 26px;
+  padding: 14px 16px;
+}
+
+/* Admin becomes a top tab bar + full-width panel on iPad. */
+html[data-device-layout="tablet"] .admin-wrap {
+  display: grid;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  height: auto;
+  min-height: 100%;
+}
+
+html[data-device-layout="tablet"] .admin-sidebar {
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+html[data-device-layout="tablet"] .admin-tabs {
+  display: flex;
+  gap: 8px;
+  min-width: max-content;
+}
+
+html[data-device-layout="tablet"] .admin-tabs button {
+  width: auto;
+  min-width: 130px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+html[data-device-layout="tablet"] .admin-panel {
+  padding: 15px;
+  overflow: visible;
+}
+
+html[data-device-layout="tablet"] .admin-panel h2 {
+  font-size: 24px !important;
+}
+
+html[data-device-layout="tablet"] .admin-panel h3 {
+  font-size: 18px !important;
+}
+
+html[data-device-layout="tablet"] .admin-note,
+html[data-device-layout="tablet"] .meta {
+  font-size: 13px !important;
+}
+
+html[data-device-layout="tablet"] .dashboard-grid,
+html[data-device-layout="tablet"] .analytics-stats {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+
+html[data-device-layout="tablet"] .analytics-filters {
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+}
+
+html[data-device-layout="tablet"] .v18-choice-grid,
+html[data-device-layout="tablet"] .v19-legal-admin-grid {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+
+html[data-device-layout="tablet"] .v19-legal-modal {
+  width: min(820px, 92vw);
+  max-height: 88dvh;
+}
+
+html[data-device-layout="tablet"] .toast {
+  position: fixed;
+  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  max-width: min(520px, 72vw);
+  font-size: 14px;
+}
+
+/* iPad portrait: simplify dense forms further. */
+html[data-device-layout="tablet"][data-device-orientation="portrait"] .admin-form-grid.three {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+
+html[data-device-layout="tablet"][data-device-orientation="portrait"] .v19-legal-admin-grid {
+  grid-template-columns: 1fr;
+}
+
+/* ------------------------------------------------------------
+   MOBILE / PHONE
+   ------------------------------------------------------------ */
+html[data-device-layout="mobile"],
+html[data-device-layout="mobile"] body {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+}
+
+html[data-device-layout="mobile"] body {
+  display: block;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #073d30;
+}
+
+html[data-device-layout="mobile"] .scene,
+html[data-device-layout="mobile"] .scene.portal-mode {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  background-position: center !important;
+  background-size: cover !important;
+  overflow: hidden;
+}
+
+/* On mobile the green workspace becomes the screen instead of a tiny board
+   inside a miniature classroom. */
+html[data-device-layout="mobile"] .board-shell,
+html[data-device-layout="mobile"] .scene.portal-mode .board-shell {
+  position: absolute;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  min-width: 0 !important;
+  border-radius: 0 !important;
+  background:
+    linear-gradient(180deg, rgba(5, 57, 43, .97), rgba(3, 40, 31, .985));
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+html[data-device-layout="mobile"] .view,
+html[data-device-layout="mobile"] .scene.portal-mode #portalView {
+  width: 100%;
+  height: 100%;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left)) !important;
+}
+
+/* Login / registration / device verification */
+html[data-device-layout="mobile"] #loginView,
+html[data-device-layout="mobile"] #registerView,
+html[data-device-layout="mobile"] #deviceVerifyView {
+  display: block;
+  overflow: auto;
+}
+
+html[data-device-layout="mobile"] #loginView > .brand,
+html[data-device-layout="mobile"] #registerView > .brand,
+html[data-device-layout="mobile"] #deviceVerifyView > .brand {
+  margin: 8px 0 20px;
+}
+
+html[data-device-layout="mobile"] .brand-kicker {
+  font-size: 12px !important;
+  letter-spacing: .12em;
+}
+
+html[data-device-layout="mobile"] .brand h1,
+html[data-device-layout="mobile"] .compact-brand h1 {
+  font-size: clamp(31px, 10vw, 44px);
+  line-height: 1;
+}
+
+html[data-device-layout="mobile"] .brand p {
+  max-width: none;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+html[data-device-layout="mobile"] .login-card {
+  width: 100%;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+html[data-device-layout="mobile"] .login-card label {
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+html[data-device-layout="mobile"] .login-card input,
+html[data-device-layout="mobile"] .login-card select,
+html[data-device-layout="mobile"] .admin-panel input,
+html[data-device-layout="mobile"] .admin-panel select,
+html[data-device-layout="mobile"] .admin-panel textarea,
+html[data-device-layout="mobile"] .community-compose input,
+html[data-device-layout="mobile"] .community-compose select,
+html[data-device-layout="mobile"] .community-compose textarea {
+  min-height: 46px;
+  font-size: 16px !important; /* prevents iPhone Safari auto-zoom */
+}
+
+html[data-device-layout="mobile"] .two-col,
+html[data-device-layout="mobile"] .admin-form-grid,
+html[data-device-layout="mobile"] .admin-form-grid.three,
+html[data-device-layout="mobile"] .color-row,
+html[data-device-layout="mobile"] .v18-choice-grid,
+html[data-device-layout="mobile"] .v19-guardian-reaccept,
+html[data-device-layout="mobile"] .v19-legal-admin-grid {
+  grid-template-columns: 1fr !important;
+}
+
+html[data-device-layout="mobile"] .button-row {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+html[data-device-layout="mobile"] .button-row .btn,
+html[data-device-layout="mobile"] .register-cta {
+  width: 100%;
+  min-height: 48px;
+}
+
+html[data-device-layout="mobile"] .v18-choice-card {
+  min-height: 74px;
+  padding: 13px;
+}
+
+html[data-device-layout="mobile"] .v18-trial-note,
+html[data-device-layout="mobile"] .v19-legal-checks {
+  font-size: 14px;
+}
+
+/* Portal header */
+html[data-device-layout="mobile"] #portalView {
+  overflow: hidden;
+}
+
+html[data-device-layout="mobile"] .board-header {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  align-items: start;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .brand-kicker {
+  font-size: 11px !important;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .board-header h1 {
+  font-size: clamp(25px, 7.8vw, 34px);
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+}
+
+html[data-device-layout="mobile"] .header-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .header-actions .btn {
+  min-width: 0;
+  min-height: 44px;
+  padding: .68em .5em;
+  font-size: 13px;
+}
+
+html[data-device-layout="mobile"] .breadcrumb {
+  font-size: 12px !important;
+  line-height: 1.35;
+  margin: 9px 0 10px !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+html[data-device-layout="mobile"] .content-area {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 2px 24px 0;
+}
+
+/* All primary content becomes one comfortable column. */
+html[data-device-layout="mobile"] .scene.portal-mode .tile-grid,
+html[data-device-layout="mobile"] html[data-menu-style="large"] .tile-grid,
+html[data-device-layout="mobile"] html[data-menu-style="compact"] .tile-grid,
+html[data-device-layout="mobile"] .scene.portal-mode .tile-grid:not(:has(.menu-tile:nth-child(3))),
+html[data-device-layout="mobile"] .activity-list,
+html[data-device-layout="mobile"] .tool-list,
+html[data-device-layout="mobile"] .resource-list,
+html[data-device-layout="mobile"] .community-grid,
+html[data-device-layout="mobile"] .unit-info-grid,
+html[data-device-layout="mobile"] .dashboard-grid,
+html[data-device-layout="mobile"] .analytics-stats,
+html[data-device-layout="mobile"] .analytics-filters,
+html[data-device-layout="mobile"] .group-member-grid {
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  gap: 12px !important;
+}
+
+html[data-device-layout="mobile"] .vocabulary-card {
+  grid-column: auto !important;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .menu-tile {
+  min-height: 96px;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .tile-icon {
+  font-size: 31px;
+  margin-bottom: 7px;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .tile-title {
+  font-size: 20px;
+  line-height: 1.15;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .tile-subtitle {
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .activity-card,
+html[data-device-layout="mobile"] .scene.portal-mode .tool-card,
+html[data-device-layout="mobile"] .resource-card {
+  min-height: 0;
+  padding: 15px;
+  border-radius: 15px;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .activity-card h3,
+html[data-device-layout="mobile"] .scene.portal-mode .tool-card h3,
+html[data-device-layout="mobile"] .resource-body h3 {
+  font-size: 18px;
+}
+
+html[data-device-layout="mobile"] .scene.portal-mode .activity-card p,
+html[data-device-layout="mobile"] .scene.portal-mode .tool-card p,
+html[data-device-layout="mobile"] .resource-body p {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+html[data-device-layout="mobile"] .resource-card {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+}
+
+html[data-device-layout="mobile"] .resource-actions {
+  grid-column: 1 / -1;
+}
+
+html[data-device-layout="mobile"] .resource-actions .btn,
+html[data-device-layout="mobile"] .activity-card .btn,
+html[data-device-layout="mobile"] .tool-card .btn {
+  min-height: 44px;
+}
+
+/* Curriculum / Topic library */
+html[data-device-layout="mobile"] .unit-dashboard-title h2 {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+html[data-device-layout="mobile"] .unit-dashboard-title p {
+  font-size: 14px;
+}
+
+html[data-device-layout="mobile"] .unit-info-card {
+  min-height: 0;
+  padding: 14px;
+}
+
+html[data-device-layout="mobile"] .unit-info-card h3 {
+  font-size: 17px;
+}
+
+html[data-device-layout="mobile"] .unit-info-card p,
+html[data-device-layout="mobile"] .unit-info-card ul {
+  font-size: 14px;
+  line-height: 1.48;
+}
+
+html[data-device-layout="mobile"] .vocab-cloud span {
+  font-size: 13px;
+  padding: .36em .62em;
+}
+
+html[data-device-layout="mobile"] .topic-package-card {
+  grid-template-columns: 42px minmax(0,1fr) 18px;
+  gap: 10px;
+  padding: 13px 12px;
+}
+
+html[data-device-layout="mobile"] .topic-package-copy strong {
+  font-size: 16px;
+}
+
+html[data-device-layout="mobile"] .topic-package-copy small {
+  font-size: 13px;
+}
+
+html[data-device-layout="mobile"] .topic-package-copy span {
+  font-size: 12px;
+}
+
+/* Community */
+html[data-device-layout="mobile"] .community-category {
+  min-height: 92px;
+  padding: 15px;
+}
+
+html[data-device-layout="mobile"] .community-topic,
+html[data-device-layout="mobile"] .forum-post,
+html[data-device-layout="mobile"] .request-card header,
+html[data-device-layout="mobile"] .manage-card,
+html[data-device-layout="mobile"] .structure-row,
+html[data-device-layout="mobile"] .package-head {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+html[data-device-layout="mobile"] .community-topic p,
+html[data-device-layout="mobile"] .forum-topic-detail p,
+html[data-device-layout="mobile"] .forum-post p {
+  font-size: 14px !important;
+}
+
+html[data-device-layout="mobile"] .request-actions,
+html[data-device-layout="mobile"] .actions,
+html[data-device-layout="mobile"] .structure-actions,
+html[data-device-layout="mobile"] .resource-actions {
+  width: 100%;
+}
+
+html[data-device-layout="mobile"] .request-actions .btn,
+html[data-device-layout="mobile"] .actions .btn,
+html[data-device-layout="mobile"] .structure-actions .btn {
+  min-height: 42px;
+}
+
+/* Admin on phone = horizontal tabs, one-column editor. */
+html[data-device-layout="mobile"] .admin-wrap {
+  display: grid;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  height: auto;
+  min-height: 100%;
+}
+
+html[data-device-layout="mobile"] .admin-sidebar {
+  padding: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 12px;
+}
+
+html[data-device-layout="mobile"] .admin-tabs {
+  display: flex;
+  gap: 7px;
+  min-width: max-content;
+}
+
+html[data-device-layout="mobile"] .admin-tabs button {
+  width: auto;
+  min-width: 115px;
+  min-height: 42px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+html[data-device-layout="mobile"] .admin-panel {
+  padding: 12px;
+  overflow: visible;
+}
+
+html[data-device-layout="mobile"] .admin-panel h2 {
+  font-size: 23px !important;
+}
+
+html[data-device-layout="mobile"] .admin-panel h3 {
+  font-size: 18px !important;
+}
+
+html[data-device-layout="mobile"] .admin-panel label,
+html[data-device-layout="mobile"] .admin-note,
+html[data-device-layout="mobile"] .meta {
+  font-size: 13px !important;
+}
+
+html[data-device-layout="mobile"] .user-row {
+  padding: 12px;
+}
+
+html[data-device-layout="mobile"] .permission-units {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+html[data-device-layout="mobile"] .permission-units label {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+html[data-device-layout="mobile"] .structure-grade {
+  margin-left: 6px;
+  padding-left: 8px;
+}
+
+html[data-device-layout="mobile"] .structure-unit {
+  margin-left: 6px;
+}
+
+html[data-device-layout="mobile"] .analytics-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+html[data-device-layout="mobile"] .analytics-table {
+  min-width: 680px;
+}
+
+/* Legal modal is a proper phone screen. */
+html[data-device-layout="mobile"] .v19-legal-overlay {
+  padding: 0;
+  align-items: stretch;
+}
+
+html[data-device-layout="mobile"] .v19-legal-modal {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+
+html[data-device-layout="mobile"] .v19-legal-modal header {
+  padding:
+    max(14px, env(safe-area-inset-top))
+    15px
+    12px;
+}
+
+html[data-device-layout="mobile"] .v19-legal-document-text {
+  padding: 15px;
+  font-size: 15px;
+}
+
+html[data-device-layout="mobile"] .v19-legal-gate-actions {
+  padding: 0 15px max(18px, env(safe-area-inset-bottom));
+}
+
+html[data-device-layout="mobile"] .toast {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  max-width: none;
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------
+   WIDTH-BASED FALLBACK
+   ------------------------------------------------------------
+   Provides sensible behavior during the tiny moment before the detector runs,
+   and also if JavaScript is blocked.
+*/
+@media (max-width: 1099px) {
+  html:not([data-device-layout]) .scene {
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 699px) {
+  html:not([data-device-layout]) .scene {
+    width: 100vw;
+    height: 100dvh;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    aspect-ratio: auto !important;
+  }
+
+  html:not([data-device-layout]) .board-shell {
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+  }
+}
+
+/* Accessibility: keep keyboard focus visible on every layout. */
+html[data-device-layout="tablet"] :focus-visible,
+html[data-device-layout="mobile"] :focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion remains respected. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-device-layout="tablet"] *,
+  html[data-device-layout="mobile"] * {
+    scroll-behavior: auto !important;
+  }
+}

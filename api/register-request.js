@@ -39,23 +39,49 @@ export default async function handler(req, res) {
   const guardianName = String(req.body?.guardianName || '').trim();
   const guardianEmail = String(req.body?.guardianEmail || '').trim().toLowerCase();
   const guardianConsent = req.body?.guardianConsent === true;
-  const termsAccepted = req.body?.termsAccepted === true;
+  const acceptedDocumentIds = Array.isArray(req.body?.acceptedDocumentIds)
+    ? [...new Set(req.body.acceptedDocumentIds.map(v => String(v || '').trim()).filter(Boolean))]
+    : [];
 
   if (username.length < 3) return res.status(400).json({ error: 'Username must contain at least 3 valid characters.' });
   if (!displayName) return res.status(400).json({ error: 'Please add your full name.' });
   if (!validEmail(contactEmail)) return res.status(400).json({ error: 'Please use a valid email address.' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
   if (!['teacher','learner'].includes(memberType)) return res.status(400).json({ error: 'Please choose Teacher or Learner.' });
-  if (!termsAccepted) return res.status(400).json({ error: 'You must accept the Terms of Use and Privacy Policy.' });
 
   if (memberType === 'teacher' && !adultConfirmed) {
     return res.status(400).json({ error: 'Teacher accounts require confirmation that the registrant is 18 or older.' });
   }
 
-  if (memberType === 'learner' && !adultConfirmed) {
+  const isMinorLearner = memberType === 'learner' && !adultConfirmed;
+  if (isMinorLearner) {
     if (!guardianName) return res.status(400).json({ error: 'A parent or guardian name is required for learners under 18.' });
     if (!validEmail(guardianEmail)) return res.status(400).json({ error: 'Please use a valid parent or guardian email address.' });
     if (!guardianConsent) return res.status(400).json({ error: 'Parent or guardian permission is required for learners under 18.' });
+  }
+
+  // Validate the exact CURRENT published legal versions on the server.
+  const requiredTypes = [
+    'common_terms',
+    memberType === 'learner' ? 'learner_terms' : 'teacher_terms',
+    'privacy_policy'
+  ];
+
+  const { data: legalDocs, error: legalError } = await admin
+    .from('legal_document_versions')
+    .select('id,document_type,version,title,published')
+    .eq('published', true)
+    .in('document_type', requiredTypes);
+
+  if (legalError) return res.status(500).json({ error: 'Legal registration documents are not installed yet.' });
+  if ((legalDocs || []).length !== requiredTypes.length) {
+    return res.status(503).json({ error: 'Registration is temporarily unavailable because the current legal documents are incomplete.' });
+  }
+
+  const accepted = new Set(acceptedDocumentIds);
+  const missing = (legalDocs || []).filter(d => !accepted.has(d.id));
+  if (missing.length) {
+    return res.status(409).json({ error: 'The Terms or Privacy Policy changed. Please reload, review the current versions, and accept them again.' });
   }
 
   const { data: existing } = await admin
@@ -86,9 +112,9 @@ export default async function handler(req, res) {
     status: 'pending',
     member_type: memberType,
     adult_confirmed: adultConfirmed,
-    guardian_name: adultConfirmed ? null : guardianName,
-    guardian_email: adultConfirmed ? null : guardianEmail,
-    guardian_consent_at: adultConfirmed ? null : nowIso,
+    guardian_name: isMinorLearner ? guardianName : null,
+    guardian_email: isMinorLearner ? guardianEmail : null,
+    guardian_consent_at: isMinorLearner ? nowIso : null,
     terms_accepted_at: nowIso,
     registration_source: 'public',
     approved_at: null,
@@ -101,5 +127,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: profileError.message });
   }
 
-  return res.status(200).json({ ok: true, username, status: 'pending', memberType });
+  const consentRows = (legalDocs || []).map(doc => ({
+    user_id: created.user.id,
+    document_version_id: doc.id,
+    document_type: doc.document_type,
+    version: doc.version,
+    member_type_at_acceptance: memberType,
+    accepted_by: isMinorLearner ? 'guardian' : 'user',
+    guardian_name: isMinorLearner ? guardianName : null,
+    guardian_email: isMinorLearner ? guardianEmail : null,
+    accepted_at: nowIso
+  }));
+
+  const { error: consentError } = await admin.from('user_legal_consents').insert(consentRows);
+  if (consentError) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    return res.status(400).json({ error: `Could not record legal acceptance: ${consentError.message}` });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    username,
+    status: 'pending',
+    memberType,
+    acceptedVersions: Object.fromEntries((legalDocs || []).map(d => [d.document_type, d.version]))
+  });
 }
