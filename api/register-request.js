@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
+import { sendEmail, emailConfigured } from './_lib/email.js';
+
+const PRIMARY_ADMIN_EMAIL = 'stephane@alphagenus.com';
 
 function cleanUsername(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
@@ -7,6 +10,192 @@ function cleanUsername(value) {
 
 function validEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function esc(v='') {
+  return String(v).replace(/[&<>"']/g, c => ({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[c]));
+}
+
+async function logRegistrationEmail(admin, {
+  registrationId,
+  recipientUserId = null,
+  email,
+  status,
+  errorMessage = null
+}) {
+  try {
+    await admin.from('email_notification_log').insert({
+      content_type: 'registration',
+      content_id: registrationId,
+      user_id: recipientUserId,
+      email,
+      status,
+      error_message: errorMessage ? String(errorMessage).slice(0, 500) : null
+    });
+  } catch {
+    // Notification logging must never break registration.
+  }
+}
+
+async function notifyRegistrationAdmins(admin, registration) {
+  const portal = process.env.PORTAL_BASE_URL || 'https://learn.pawntoprofessor.com';
+
+  // Start with Stéphane as the guaranteed primary notification address.
+  const recipientMap = new Map();
+  recipientMap.set(PRIMARY_ADMIN_EMAIL.toLowerCase(), {
+    user_id: null,
+    display_name: 'Stéphane',
+    contact_email: PRIMARY_ADMIN_EMAIL
+  });
+
+  // Add every active Admin / Owner that has a valid contact email.
+  const { data: staff, error: staffError } = await admin
+    .from('profiles')
+    .select('id,username,display_name,contact_email,role,status,expires_at')
+    .in('role', ['admin','owner'])
+    .eq('status', 'active');
+
+  if (!staffError) {
+    for (const person of staff || []) {
+      const email = String(person.contact_email || '').trim().toLowerCase();
+      if (!validEmail(email)) continue;
+      if (person.expires_at && new Date(person.expires_at) <= new Date()) continue;
+
+      // If this is the primary email, enrich it with the real profile id/name.
+      recipientMap.set(email, {
+        user_id: person.id,
+        display_name: person.display_name || person.username || 'Administrator',
+        contact_email: email
+      });
+    }
+  }
+
+  const recipients = [...recipientMap.values()];
+  const accountLabel = registration.memberType === 'learner' ? 'Learner' : 'Teacher';
+  const ageLabel = registration.memberType === 'teacher'
+    ? '18+ confirmed'
+    : registration.isMinorLearner
+      ? 'Under 18 · guardian consent received'
+      : '18+';
+
+  const subject = `New Pawn to Professor registration — ${accountLabel}`;
+
+  const text = [
+    'Pawn to Professor',
+    '',
+    'A new registration request is waiting for review.',
+    '',
+    `Name: ${registration.displayName}`,
+    `Username: ${registration.username}`,
+    `Account type: ${accountLabel}`,
+    `Email: ${registration.contactEmail}`,
+    `Age status: ${ageLabel}`,
+    'Status: Pending',
+    `Registration time: ${registration.nowIso}`,
+    '',
+    'Open Pawn to Professor:',
+    portal,
+    '',
+    'Go to Admin → Requests to approve or reject the registration.',
+    '',
+    'For security, this email never contains the user password.'
+  ].join('\n');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.55;color:#1f2937">
+      <h2 style="margin-bottom:8px">Pawn to Professor</h2>
+      <p><strong>A new registration request is waiting for review.</strong></p>
+
+      <table style="border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:5px 14px 5px 0"><strong>Name</strong></td><td>${esc(registration.displayName)}</td></tr>
+        <tr><td style="padding:5px 14px 5px 0"><strong>Username</strong></td><td>${esc(registration.username)}</td></tr>
+        <tr><td style="padding:5px 14px 5px 0"><strong>Account type</strong></td><td>${esc(accountLabel)}</td></tr>
+        <tr><td style="padding:5px 14px 5px 0"><strong>Email</strong></td><td>${esc(registration.contactEmail)}</td></tr>
+        <tr><td style="padding:5px 14px 5px 0"><strong>Age status</strong></td><td>${esc(ageLabel)}</td></tr>
+        <tr><td style="padding:5px 14px 5px 0"><strong>Status</strong></td><td>Pending</td></tr>
+      </table>
+
+      <p>
+        <a href="${esc(portal)}"
+           style="display:inline-block;padding:12px 18px;background:#0f5a42;color:white;text-decoration:none;border-radius:8px">
+          Open Learning Hub
+        </a>
+      </p>
+
+      <p>Then open <strong>Admin → Requests</strong> to approve or reject the account.</p>
+
+      <p style="font-size:12px;color:#666">
+        For security, the registration email never contains the user's password.
+        For an under-18 Learner, guardian contact details remain inside the secure
+        Admin/database record and are not copied into this notification email.
+      </p>
+    </div>
+  `;
+
+  if (!emailConfigured()) {
+    for (const recipient of recipients) {
+      await logRegistrationEmail(admin, {
+        registrationId: registration.userId,
+        recipientUserId: recipient.user_id,
+        email: recipient.contact_email,
+        status: 'skipped',
+        errorMessage: 'Email is not configured. Add RESEND_API_KEY and EMAIL_FROM in Vercel.'
+      });
+    }
+    return { sent:0, failed:0, skipped:recipients.length };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  // Small batches avoid hammering the email provider if there are many Admins.
+  for (let i = 0; i < recipients.length; i += 5) {
+    const chunk = recipients.slice(i, i + 5);
+
+    const results = await Promise.allSettled(
+      chunk.map(async recipient => {
+        await sendEmail({
+          to: recipient.contact_email,
+          subject,
+          text,
+          html
+        });
+        return recipient;
+      })
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      const recipient = chunk[j];
+
+      if (result.status === 'fulfilled') {
+        sent++;
+        await logRegistrationEmail(admin, {
+          registrationId: registration.userId,
+          recipientUserId: recipient.user_id,
+          email: recipient.contact_email,
+          status: 'sent'
+        });
+      } else {
+        failed++;
+        await logRegistrationEmail(admin, {
+          registrationId: registration.userId,
+          recipientUserId: recipient.user_id,
+          email: recipient.contact_email,
+          status: 'failed',
+          errorMessage: result.reason?.message || result.reason || 'Email failed'
+        });
+      }
+    }
+  }
+
+  return { sent, failed, skipped:0 };
 }
 
 export default async function handler(req, res) {
@@ -103,6 +292,7 @@ export default async function handler(req, res) {
   if (createError) return res.status(400).json({ error: createError.message });
 
   const nowIso = new Date().toISOString();
+
   const { error: profileError } = await admin.from('profiles').upsert({
     id: created.user.id,
     username,
@@ -139,10 +329,40 @@ export default async function handler(req, res) {
     accepted_at: nowIso
   }));
 
-  const { error: consentError } = await admin.from('user_legal_consents').insert(consentRows);
+  const { error: consentError } = await admin
+    .from('user_legal_consents')
+    .insert(consentRows);
+
   if (consentError) {
     await admin.auth.admin.deleteUser(created.user.id);
-    return res.status(400).json({ error: `Could not record legal acceptance: ${consentError.message}` });
+    return res.status(400).json({
+      error: `Could not record legal acceptance: ${consentError.message}`
+    });
+  }
+
+  // IMPORTANT:
+  // The account is already safely registered at this point.
+  // Notification failure must NOT cancel or delete the registration.
+  let notification = { sent:0, failed:0, skipped:0 };
+
+  try {
+    notification = await notifyRegistrationAdmins(admin, {
+      userId: created.user.id,
+      username,
+      displayName,
+      contactEmail,
+      memberType,
+      isMinorLearner,
+      nowIso
+    });
+  } catch (notificationError) {
+    await logRegistrationEmail(admin, {
+      registrationId: created.user.id,
+      recipientUserId: null,
+      email: PRIMARY_ADMIN_EMAIL,
+      status: 'failed',
+      errorMessage: notificationError?.message || 'Registration notification failed'
+    });
   }
 
   return res.status(200).json({
@@ -150,6 +370,9 @@ export default async function handler(req, res) {
     username,
     status: 'pending',
     memberType,
-    acceptedVersions: Object.fromEntries((legalDocs || []).map(d => [d.document_type, d.version]))
+    acceptedVersions: Object.fromEntries(
+      (legalDocs || []).map(d => [d.document_type, d.version])
+    ),
+    adminNotification: notification
   });
 }
