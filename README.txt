@@ -1,24 +1,38 @@
-Pawn to Professor v1.9.6a
-VERCEL FREE 12-FUNCTION FIX
+Pawn to Professor v1.9.7
 
-NO SQL.
+3-DAY TRIAL + ONE-YEAR PAYMENTS + ACCOUNTING
+
+RUN SQL FIRST:
+supabase/v1.9.7-annual-payments-accounting.sql
 
 ADD:
-- api/_lib/mailbox-actions.js
+- api/_lib/payment-actions.js
+- payments-accounting.js
+- payments-accounting.css
+- supabase/v1.9.7-annual-payments-accounting.sql
 
 REPLACE:
-- member-mailbox.js
-
-EDIT:
 - api/security.js
-  Add one import + two switch cases.
-  Exact snippet is in SECURITY-EDIT-SNIPPET.txt.
+- api/_lib/security.js
+- api/_lib/mailbox-actions.js
+- member-mailbox.js
+- index.html
+- vercel.json
 
-DELETE:
+KEEP DELETED:
 - api/support/message.js
 - api/admin/approve-registration.js
 
-Result:
-14 API endpoint files -> 12 API endpoint files.
+NEW:
+- 3-day trials
+- annual paid access
+- payment ledger
+- refunds/corrections without deleting history
+- renewal reminders 30 and 7 days before expiry
+- Excel + CSV accounting export
+- annual access expiry without disabling member account
 
-All v1.9.6 mailbox, welcome, trial, email and access-contact features remain.
+IMPORTANT:
+Add CRON_SECRET in Vercel for automatic renewal emails.
+
+See SETUP-v1.9.7.md.

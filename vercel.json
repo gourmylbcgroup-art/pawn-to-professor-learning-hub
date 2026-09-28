@@ -24,6 +24,12 @@
       "destination": "/api/security?action=reset-password"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/security?action=renewal-reminders",
+      "schedule": "0 1 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

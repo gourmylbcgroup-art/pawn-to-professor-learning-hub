@@ -42,6 +42,10 @@
   function trialMode() {
     if (!isNormalMember()) return 'none';
 
+    if (globalThis.PTP_PAYMENT_STATE?.hadPaidAccess && !globalThis.PTP_PAYMENT_STATE?.active) {
+      return 'annual_expired';
+    }
+
     const started = state.profile.trial_started_at
       ? new Date(state.profile.trial_started_at)
       : null;
@@ -410,7 +414,7 @@
     if (mode === 'active') {
       return {
         heading: '🔒 This content is not included in your free trial',
-        text: `Your 7-day trial gives you access to selected Unit 1 content. ${title} is not currently included.`,
+        text: `Your 3-day trial gives you access to selected Unit 1 content. ${title} is not currently included.`,
         button: '📨 Message Admin About Access'
       };
     }
@@ -418,8 +422,16 @@
     if (mode === 'expired') {
       return {
         heading: '⏰ Your free trial has ended',
-        text: 'Your account is still active, but your free learning access has finished. Contact the administrator to continue with a paid access plan.',
-        button: '📨 Contact Admin to Continue'
+        text: 'Your account is still active, but your free learning access has finished. Contact the administrator to continue with a one-year paid access plan.',
+        button: '💳 Contact Admin to Continue'
+      };
+    }
+
+    if (mode === 'annual_expired') {
+      return {
+        heading: '⏰ Your annual access has ended',
+        text: 'Your account is still active, but your one-year learning access has expired. Community and My Messages remain available. Contact the administrator to renew.',
+        button: '💳 Renew Annual Access'
       };
     }
 
@@ -434,13 +446,17 @@
     const title = unit?.title ? `${unit.name} — ${unit.title}` : (unit?.name || 'learning content');
     const mode = trialMode();
 
-    const subject = mode === 'expired'
-      ? 'Continue after my free trial'
-      : `Request access to ${title}`;
+    const subject = mode === 'annual_expired'
+      ? 'Renew my annual access'
+      : mode === 'expired'
+        ? 'Continue after my free trial'
+        : `Request access to ${title}`;
 
-    const body = mode === 'expired'
-      ? `My 7-day free trial has ended and I would like to continue using Pawn to Professor.\n\nPlease send me information about the available access/payment options.`
-      : `I tried to open:\n${title}\n\nMy current access does not include this content. I would like information about getting access.`;
+    const body = mode === 'annual_expired'
+      ? `My one-year Pawn to Professor access has ended and I would like to renew.\n\nPlease confirm the current renewal price and payment instructions.`
+      : mode === 'expired'
+        ? `My 3-day free trial has ended and I would like to continue using Pawn to Professor.\n\nPlease send me information about the current one-year access price and payment options.`
+        : `I tried to open:\n${title}\n\nMy current access does not include this content. I would like information about getting access.`;
 
     return {
       category: 'access_payment',
@@ -534,7 +550,7 @@
       if (!banner.classList.contains('expired')) {
         composeSeed.subject = 'Ask about more access during my trial';
         composeSeed.body =
-          'My 7-day trial is active and I would like information about accessing more Pawn to Professor content.';
+          'My 3-day trial is active and I would like information about accessing more Pawn to Professor content.';
         composeSeed.context.source = 'trial_banner';
       }
       state.view = 'mailbox';
@@ -699,7 +715,7 @@
             ).join('')}
           </select>
         </label>
-        <button id="mailboxManageAccess" class="btn btn-small btn-ghost" type="button">👤 Manage Member Access</button>
+        <button id="mailboxManageAccess" class="btn btn-small btn-ghost" type="button">👤 Manage Member Access</button>\n        <button id="mailboxRecordPayment" class="btn btn-small btn-accent" type="button">💰 Record Payment</button>
       </div>
 
       <div class="mailbox-messages">
@@ -757,6 +773,14 @@
       state.selectedAdminUser = state.adminUsers.find(u => u.id === thread.member_id) || null;
       state.adminTab = 'users';
       render();
+    });
+
+    area.querySelector('#mailboxRecordPayment')?.addEventListener('click', () => {
+      if (globalThis.PTP_PAYMENTS?.openRecordPayment) {
+        globalThis.PTP_PAYMENTS.openRecordPayment(thread.member_id, thread.id);
+      } else {
+        toast('Payments module is still loading.');
+      }
     });
 
     area.querySelector('#mailboxAdminSendReply').addEventListener('click', async e => {

@@ -62,7 +62,7 @@ export async function getAuthenticatedProfile(admin, req) {
   if (authError || !authData?.user) return { token, user: null, profile: null, sessionId: null, error: 'Invalid session.' };
   const { data: profile, error: profileError } = await admin
     .from('profiles')
-    .select('id,username,display_name,contact_email,role,status,expires_at')
+    .select('id,username,display_name,contact_email,member_type,role,status,expires_at')
     .eq('id', authData.user.id)
     .maybeSingle();
   if (profileError || !profile) return { token, user: authData.user, profile: null, sessionId: sessionIdFromJwt(token), error: 'Profile not found.' };

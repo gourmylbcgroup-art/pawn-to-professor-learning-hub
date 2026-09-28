@@ -1,0 +1,222 @@
+/* Pawn to Professor v1.9.7 — Payments & Accounting */
+
+.v197-paid-banner {
+  display:flex;
+  align-items:center;
+  gap:.75em;
+  padding:.75em .85em;
+  margin:0 0 .75em;
+  border:1px solid var(--board-line);
+  border-radius:14px;
+  background:rgba(52,211,153,.11);
+}
+
+.v197-paid-banner.renewal-due {
+  background:rgba(250,204,21,.12);
+}
+
+.v197-paid-banner.expired {
+  background:rgba(248,113,113,.10);
+}
+
+.v197-paid-icon {
+  font-size:1.7em;
+}
+
+.v197-paid-copy {
+  min-width:0;
+  flex:1;
+  display:grid;
+  gap:.12em;
+}
+
+.v197-paid-copy span {
+  color:var(--chalk-soft);
+}
+
+.v197-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:.7em;
+  flex-wrap:wrap;
+}
+
+.v197-head h2 {
+  margin-top:0;
+}
+
+.v197-head .actions {
+  display:flex;
+  gap:.4em;
+  flex-wrap:wrap;
+}
+
+.v197-stats {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.5em;
+  margin:.65em 0;
+}
+
+.v197-stats > div {
+  padding:.7em;
+  border:1px solid var(--board-line);
+  border-radius:12px;
+  background:rgba(255,255,255,.06);
+  display:grid;
+  gap:.15em;
+}
+
+.v197-stats strong {
+  font-size:1.2em;
+}
+
+.v197-stats span {
+  color:var(--chalk-soft);
+  font-size:.78em;
+}
+
+.v197-filters {
+  display:grid;
+  grid-template-columns:minmax(170px,1.2fr) repeat(4,minmax(120px,.7fr));
+  gap:.45em;
+  align-items:end;
+  margin:.7em 0;
+}
+
+.v197-filters label {
+  margin:0;
+}
+
+.v197-table-wrap {
+  overflow:auto;
+  border:1px solid var(--board-line);
+  border-radius:12px;
+}
+
+.v197-table {
+  width:100%;
+  min-width:980px;
+  border-collapse:collapse;
+}
+
+.v197-table th,
+.v197-table td {
+  padding:.58em .62em;
+  border-bottom:1px solid var(--board-line);
+  text-align:left;
+  vertical-align:top;
+}
+
+.v197-table th {
+  position:sticky;
+  top:0;
+  background:rgba(7,61,48,.97);
+  z-index:1;
+}
+
+.v197-table td small {
+  display:block;
+  color:var(--chalk-soft);
+  margin-top:.1em;
+}
+
+.v197-table td.amount {
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.v197-table tr.adjustment td.amount {
+  color:#ffd2d2;
+}
+
+.v197-modal {
+  position:fixed;
+  inset:0;
+  z-index:12000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(0,0,0,.65);
+}
+
+.v197-modal-card {
+  width:min(820px,96vw);
+  max-height:92dvh;
+  overflow:auto;
+  background:#073d30;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.24);
+  border-radius:18px;
+  padding:1em;
+  box-shadow:0 24px 70px rgba(0,0,0,.45);
+}
+
+.v197-modal-head {
+  display:flex;
+  justify-content:space-between;
+  gap:.7em;
+  align-items:flex-start;
+}
+
+.v197-modal-head h2 {
+  margin:0;
+}
+
+.v197-modal-head p {
+  margin:.2em 0 .6em;
+  color:rgba(255,255,255,.75);
+}
+
+.v197-form-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.55em;
+}
+
+.v197-form-grid .wide {
+  grid-column:1 / -1;
+}
+
+.v197-confirm-note {
+  margin:.7em 0;
+  padding:.6em .7em;
+  border-radius:10px;
+  background:rgba(255,208,74,.10);
+  border:1px solid rgba(255,208,74,.25);
+}
+
+@media (max-width:900px) {
+  .v197-stats {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .v197-filters {
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+html[data-device-layout="mobile"] .v197-paid-banner {
+  align-items:stretch;
+  flex-wrap:wrap;
+}
+
+html[data-device-layout="mobile"] .v197-paid-banner .btn {
+  width:100%;
+}
+
+html[data-device-layout="mobile"] .v197-stats,
+html[data-device-layout="mobile"] .v197-filters,
+html[data-device-layout="mobile"] .v197-form-grid {
+  grid-template-columns:1fr;
+}
+
+html[data-device-layout="mobile"] .v197-form-grid .wide {
+  grid-column:auto;
+}
+
+html[data-device-layout="mobile"] .v197-head .actions,
+html[data-device-layout="mobile"] .v197-head .actions .btn {
+  width:100%;
+}

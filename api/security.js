@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 import { emailConfigured, sendEmail } from './_lib/email.js';
 import { handleSupportMessage, handleApproveRegistration } from './_lib/mailbox-actions.js';
+import { handleRecordAnnualPayment, handlePaymentAdjustment, handleRenewalReminders } from './_lib/payment-actions.js';
 import {
   json,
   getAuthenticatedProfile,
@@ -422,13 +423,18 @@ async function resetPassword({ req, res, admin }) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
+  const action = actionFromRequest(req);
+
+  if (action === 'renewal-reminders') {
+    if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+  } else if (req.method !== 'POST') {
+    return json(res, 405, { error: 'Method not allowed' });
+  }
 
   const url = process.env.SUPABASE_URL;
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !secret) return json(res, 500, { error: 'Server configuration is incomplete.' });
 
-  const action = actionFromRequest(req);
   const admin = createClient(url, secret, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
@@ -448,6 +454,12 @@ export default async function handler(req, res) {
       return handleSupportMessage({ req, res, admin });
     case 'approve-registration':
       return handleApproveRegistration({ req, res, admin });
+    case 'record-annual-payment':
+      return handleRecordAnnualPayment({ req, res, admin });
+    case 'payment-adjustment':
+      return handlePaymentAdjustment({ req, res, admin });
+    case 'renewal-reminders':
+      return handleRenewalReminders({ req, res, admin });
     default:
       return json(res, 404, { error: 'Unknown security action.' });
   }

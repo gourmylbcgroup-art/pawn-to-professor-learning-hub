@@ -461,7 +461,7 @@ export async function handleApproveRegistration({ req, res, admin }) {
   if (target.role !== 'user') return json(res, 400, { error: 'This is not a normal member registration.' });
   if (target.status !== 'pending') return json(res, 409, { error: 'This registration is no longer pending.' });
 
-  // v1.8 database trigger starts the 7-day trial on this status transition.
+  // v1.8 database trigger starts the 3-day trial on this status transition.
   const { error: approveError } = await admin
     .from('profiles')
     .update({ status: 'active' })
@@ -501,7 +501,7 @@ export async function handleApproveRegistration({ req, res, admin }) {
 
 Welcome to Pawn to Professor 👋
 
-Your Teacher account has been approved and your 7-day trial is now active.
+Your Teacher account has been approved and your 3-day trial is now active.
 
 If you need help with access, resources, payment, or your account, simply reply privately to this message at any time.
 
@@ -511,7 +511,7 @@ Pawn to Professor Admin`;
 
 Welcome to Pawn to Professor 👋
 
-Your Learner account has been approved and your 7-day trial is now active.
+Your Learner account has been approved and your 3-day trial is now active.
 
 If you need help with a lesson, access, payment, or your account, simply reply privately to this message at any time.
 
@@ -598,7 +598,7 @@ You can reply privately through My Messages after signing in.`;
     details: {
       username: approved.username,
       member_type: approved.member_type || 'teacher',
-      trial_days: 7,
+      trial_days: 3,
       welcome_created: welcomeCreated,
       welcome_error: welcomeError
     }
