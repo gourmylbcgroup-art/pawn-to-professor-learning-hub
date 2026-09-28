@@ -5,7 +5,7 @@
 (() => {
   if (typeof state === 'undefined' || typeof render === 'undefined') return;
 
-  const VERSION = '1.9.6';
+  const VERSION = '1.9.8';
   let memberSelectedThreadId = null;
   let adminSelectedThreadId = null;
   let composeSeed = null;
@@ -117,6 +117,199 @@
   function statusPill(status) {
     return `<span class="mailbox-status ${esc(status)}">${esc(STATUS_LABELS[status] || status)}</span>`;
   }
+
+  function messageReceiptHtml(message, viewer) {
+    const sentAt = message.created_at ? new Date(message.created_at) : null;
+    const deliveredAt = message.delivered_at ? new Date(message.delivered_at) : null;
+    const readAt = message.read_at ? new Date(message.read_at) : null;
+
+    const ownMessage = viewer === 'member'
+      ? message.sender_kind === 'member'
+      : (message.sender_kind === 'admin' || message.sender_kind === 'system');
+
+    if (!ownMessage) return '';
+
+    if (readAt) {
+      const who = viewer === 'member' ? 'Admin' : 'Member';
+      return `<div class="mailbox-receipt read">✓✓ Read by ${who} · ${esc(readAt.toLocaleString())}</div>`;
+    }
+
+    if (deliveredAt) {
+      return `<div class="mailbox-receipt delivered">✓✓ Delivered · ${esc(deliveredAt.toLocaleString())}</div>`;
+    }
+
+    return `<div class="mailbox-receipt sent">✓ Sent${sentAt ? ` · ${esc(sentAt.toLocaleString())}` : ''}</div>`;
+  }
+
+  function openAdminCompose() {
+    const members = (state.adminUsers || [])
+      .filter(u => u.role === 'user' && u.status === 'active')
+      .sort((a,b) => String(a.display_name || a.username).localeCompare(String(b.display_name || b.username)));
+
+    document.querySelector('.mailbox-admin-compose-modal')?.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'mailbox-admin-compose-modal';
+    modal.innerHTML = `
+      <section class="mailbox-admin-compose-card" role="dialog" aria-modal="true">
+        <div class="mailbox-compose-head">
+          <div>
+            <h2>📨 New Admin Message</h2>
+            <p>Send a private copy to one member, selected members, or a member group.</p>
+          </div>
+          <button class="btn btn-small btn-ghost" data-close type="button">✕</button>
+        </div>
+
+        <div class="mailbox-admin-compose-grid">
+          <label>
+            Send to
+            <select data-audience>
+              <option value="one">One member</option>
+              <option value="selected">Several selected members</option>
+              <option value="teachers">All Teachers</option>
+              <option value="learners">All Learners</option>
+              <option value="all">All Members</option>
+            </select>
+          </label>
+
+          <label>
+            Category
+            <select data-category>
+              <option value="general">General</option>
+              <option value="access_payment">Access / Payment</option>
+              <option value="technical">Technical</option>
+              <option value="account">Account</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label class="wide" data-one-wrap>
+            Member
+            <select data-one>
+              <option value="">Choose member…</option>
+              ${members.map(m => `<option value="${m.id}">${esc(m.display_name || m.username)} · ${esc(m.member_type || 'member')} · ${esc(m.username)}</option>`).join('')}
+            </select>
+          </label>
+
+          <label class="wide hidden" data-selected-wrap>
+            Select several members
+            <select data-selected multiple size="8">
+              ${members.map(m => `<option value="${m.id}">${esc(m.display_name || m.username)} · ${esc(m.member_type || 'member')} · ${esc(m.username)}</option>`).join('')}
+            </select>
+            <span class="field-help">Mac: Command-click to choose several people.</span>
+          </label>
+
+          <label class="wide">
+            Subject
+            <input data-subject maxlength="180" placeholder="Message subject">
+          </label>
+
+          <label class="wide">
+            Message
+            <textarea data-body maxlength="8000" rows="7" placeholder="Write the private Admin message…"></textarea>
+          </label>
+
+          <label class="checkbox-card wide">
+            <input data-email type="checkbox" checked>
+            Also send an email notification
+          </label>
+        </div>
+
+        <div class="mailbox-admin-send-warning hidden" data-warning></div>
+
+        <div class="button-row">
+          <button class="btn btn-ghost" data-close type="button">Cancel</button>
+          <button class="btn btn-accent" data-send type="button">Send Private Message</button>
+        </div>
+      </section>
+    `;
+
+    const audience = modal.querySelector('[data-audience]');
+    const oneWrap = modal.querySelector('[data-one-wrap]');
+    const selectedWrap = modal.querySelector('[data-selected-wrap]');
+    const warning = modal.querySelector('[data-warning]');
+
+    const refreshAudience = () => {
+      oneWrap.classList.toggle('hidden', audience.value !== 'one');
+      selectedWrap.classList.toggle('hidden', audience.value !== 'selected');
+
+      const counts = {
+        teachers: members.filter(m => m.member_type === 'teacher').length,
+        learners: members.filter(m => m.member_type === 'learner').length,
+        all: members.length
+      };
+
+      if (['teachers','learners','all'].includes(audience.value)) {
+        const count = counts[audience.value] || 0;
+        warning.classList.remove('hidden');
+        warning.textContent = `This will create ${count} separate private mailbox message${count === 1 ? '' : 's'}. Members cannot see each other.`;
+      } else {
+        warning.classList.add('hidden');
+        warning.textContent = '';
+      }
+    };
+
+    audience.addEventListener('change', refreshAudience);
+    refreshAudience();
+
+    modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => modal.remove()));
+
+    modal.querySelector('[data-send]').addEventListener('click', async e => {
+      const btn = e.currentTarget;
+      const audienceValue = audience.value;
+      const subject = modal.querySelector('[data-subject]').value.trim();
+      const body = modal.querySelector('[data-body]').value.trim();
+
+      let userIds = [];
+      if (audienceValue === 'one') {
+        const id = modal.querySelector('[data-one]').value;
+        if (id) userIds = [id];
+      } else if (audienceValue === 'selected') {
+        userIds = [...modal.querySelector('[data-selected]').selectedOptions].map(o => o.value);
+      }
+
+      if ((audienceValue === 'one' || audienceValue === 'selected') && !userIds.length) {
+        return toast('Choose at least one member.');
+      }
+      if (!subject || !body) return toast('Add a subject and message.');
+
+      let count = userIds.length;
+      if (audienceValue === 'teachers') count = members.filter(m => m.member_type === 'teacher').length;
+      if (audienceValue === 'learners') count = members.filter(m => m.member_type === 'learner').length;
+      if (audienceValue === 'all') count = members.length;
+
+      if (count > 1 && !confirm(`Send this private message to ${count} members? Each person receives a separate private copy.`)) {
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      try {
+        const result = await api({
+          action: 'admin_broadcast',
+          audience: audienceValue,
+          userIds,
+          category: modal.querySelector('[data-category]').value,
+          subject,
+          body,
+          sendEmail: modal.querySelector('[data-email]').checked
+        });
+
+        modal.remove();
+        adminSelectedThreadId = null;
+        toast(`Delivered to ${result.mailboxDelivered || result.recipientCount || 0} mailbox${(result.recipientCount || 0) === 1 ? '' : 'es'}. Email: ${result.emailSent || 0} sent${result.emailFailed ? `, ${result.emailFailed} failed` : ''}.`);
+        if (state.view === 'admin' && state.adminTab === 'messages') render();
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Send Private Message';
+      }
+    });
+
+    document.body.appendChild(modal);
+  }
+
 
   function threadCard(thread, { admin = false, member = null } = {}) {
     const unread = admin
@@ -320,6 +513,7 @@
                 <span>${new Date(m.created_at).toLocaleString()}</span>
               </div>
               <div class="mailbox-message-body">${esc(m.body)}</div>
+              ${messageReceiptHtml(m, 'member')}
             </article>`;
         }).join('')}
       </div>
@@ -605,11 +799,16 @@
   // -----------------------------------------------------------------------
   async function renderAdminMessages(panel) {
     panel.innerHTML = `
-      <h2>📨 Messages</h2>
-      <p class="admin-note">
-        Private member support, access and payment conversations.
-        A new member message emails Stéphane and every active Admin/Owner.
-      </p>
+      <div class="mailbox-toolbar">
+        <div>
+          <h2>📨 Messages</h2>
+          <p class="admin-note">
+            Private member support, access and payment conversations.
+            A new member message emails Stéphane and every active Admin/Owner.
+          </p>
+        </div>
+        <button id="mailboxAdminNewMessage" class="btn btn-accent" type="button">+ New Message</button>
+      </div>
       <div id="mailboxAdminArea"><div class="empty-state" style="height:120px">Loading messages…</div></div>
     `;
 
@@ -626,6 +825,8 @@
 
     const members = await loadProfiles(threads.map(t => t.member_id));
     const area = panel.querySelector('#mailboxAdminArea');
+
+    panel.querySelector('#mailboxAdminNewMessage')?.addEventListener('click', openAdminCompose);
 
     if (adminSelectedThreadId) {
       const thread = threads.find(t => t.id === adminSelectedThreadId);
@@ -732,6 +933,7 @@
                 <span>${new Date(m.created_at).toLocaleString()}</span>
               </div>
               <div class="mailbox-message-body">${esc(m.body)}</div>
+              ${messageReceiptHtml(m, 'admin')}
             </article>`;
         }).join('')}
       </div>

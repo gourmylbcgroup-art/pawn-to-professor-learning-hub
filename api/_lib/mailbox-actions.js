@@ -158,18 +158,18 @@ async function notifyAdmins(admin, thread, member, body) {
 
 async function notifyMember(admin, thread, member, body) {
   const settings = await getSettings(admin);
-  if (!settings.enabled) return;
+  if (!settings.enabled) return { status: 'skipped', reason: 'Mailbox email notifications are disabled.' };
 
   const email = String(member.contact_email || '').trim();
-  if (!validEmail(email)) return;
+  if (!validEmail(email)) return { status: 'skipped', reason: 'Member has no valid contact email.' };
 
   const portal = process.env.PORTAL_BASE_URL || 'https://learn.pawntoprofessor.com';
-  const subject = `Pawn to Professor — Admin replied: ${thread.subject}`;
+  const subject = `Pawn to Professor — Admin message: ${thread.subject}`;
 
   const text = [
     `Hello ${member.display_name || member.username},`,
     '',
-    'You have a new private reply from Pawn to Professor Admin.',
+    'You have a new private message from Pawn to Professor Admin.',
     '',
     body,
     '',
@@ -181,20 +181,21 @@ async function notifyMember(admin, thread, member, body) {
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.55;color:#1f2937">
       <p>Hello ${esc(member.display_name || member.username)},</p>
-      <p>You have a new private reply from <strong>Pawn to Professor Admin</strong>.</p>
+      <p>You have a new private message from <strong>Pawn to Professor Admin</strong>.</p>
       <p><strong>${esc(thread.subject)}</strong></p>
       <div style="padding:12px 14px;background:#f3f4f6;border-radius:8px;white-space:pre-wrap">${esc(body)}</div>
       <p style="margin-top:18px"><a href="${esc(portal)}" style="display:inline-block;padding:11px 16px;background:#0f5a42;color:#fff;text-decoration:none;border-radius:8px">Open My Messages</a></p>
     </div>`;
 
   if (!emailConfigured()) {
-    return logEmail(admin, {
+    await logEmail(admin, {
       threadId: thread.id,
       userId: member.id,
       email,
       status: 'skipped',
       error: 'Email is not configured.'
     });
+    return { status: 'skipped', reason: 'Email is not configured.' };
   }
 
   try {
@@ -205,6 +206,7 @@ async function notifyMember(admin, thread, member, body) {
       email,
       status: 'sent'
     });
+    return { status: 'sent' };
   } catch (err) {
     await logEmail(admin, {
       threadId: thread.id,
@@ -213,6 +215,7 @@ async function notifyMember(admin, thread, member, body) {
       status: 'failed',
       error: err?.message || err
     });
+    return { status: 'failed', reason: err?.message || String(err) };
   }
 }
 
@@ -236,6 +239,150 @@ export async function handleSupportMessage({ req, res, admin }) {
 
   const action = clean(req.body?.action, 40);
   const staff = ['admin','owner'].includes(auth.profile.role);
+
+
+  if (action === 'admin_broadcast') {
+    if (!staff) return json(res, 403, { error: 'Administrator access required.' });
+
+    const audience = clean(req.body?.audience, 40);
+    const category = clean(req.body?.category || 'general', 40);
+    const subject = clean(req.body?.subject, 180);
+    const body = clean(req.body?.body, 8000);
+    const sendEmailCopy = req.body?.sendEmail !== false;
+    const requestedIds = Array.isArray(req.body?.userIds)
+      ? [...new Set(req.body.userIds.map(v => clean(v, 80)).filter(Boolean))]
+      : [];
+
+    if (!['one','selected','teachers','learners','all'].includes(audience)) {
+      return json(res, 400, { error: 'Choose who should receive the message.' });
+    }
+    if (!['general','access_payment','technical','account','other'].includes(category)) {
+      return json(res, 400, { error: 'Choose a valid message category.' });
+    }
+    if (subject.length < 3) return json(res, 400, { error: 'Add a short subject.' });
+    if (!body) return json(res, 400, { error: 'Write a message before sending.' });
+
+    let q = admin
+      .from('profiles')
+      .select('id,username,display_name,contact_email,member_type,role,status,expires_at')
+      .eq('role', 'user')
+      .eq('status', 'active');
+
+    if (audience === 'teachers') q = q.eq('member_type', 'teacher');
+    if (audience === 'learners') q = q.eq('member_type', 'learner');
+
+    if (audience === 'one' || audience === 'selected') {
+      if (!requestedIds.length) return json(res, 400, { error: 'Choose at least one member.' });
+      q = q.in('id', audience === 'one' ? requestedIds.slice(0,1) : requestedIds.slice(0,200));
+    }
+
+    const { data: rawMembers, error: memberError } = await q.limit(200);
+    if (memberError) return json(res, 400, { error: memberError.message });
+
+    const now = new Date();
+    const members = (rawMembers || []).filter(p =>
+      !p.expires_at || new Date(p.expires_at) > now
+    );
+
+    if (!members.length) return json(res, 400, { error: 'No active recipients matched this selection.' });
+
+    const broadcastId = globalThis.crypto?.randomUUID?.()
+      || `broadcast-${Date.now()}-${auth.profile.id}`;
+
+    const threadRows = members.map(member => ({
+      member_id: member.id,
+      category,
+      subject,
+      status: 'new',
+      context: {
+        admin_broadcast: true,
+        broadcast_id: broadcastId,
+        audience
+      },
+      created_by: auth.profile.id,
+      admin_unread_count: 0,
+      member_unread_count: 1,
+      last_message_at: new Date().toISOString()
+    }));
+
+    const { data: threads, error: threadError } = await admin
+      .from('support_threads')
+      .insert(threadRows)
+      .select('id,member_id,category,subject');
+
+    if (threadError) return json(res, 400, { error: threadError.message });
+
+    const messageRows = (threads || []).map(thread => ({
+      thread_id: thread.id,
+      sender_id: auth.profile.id,
+      sender_kind: 'admin',
+      body,
+      delivered_at: new Date().toISOString()
+    }));
+
+    const { error: messageError } = await admin
+      .from('support_messages')
+      .insert(messageRows);
+
+    if (messageError) {
+      const ids = (threads || []).map(t => t.id);
+      if (ids.length) await admin.from('support_threads').delete().in('id', ids);
+      return json(res, 400, { error: messageError.message });
+    }
+
+    let emailSent = 0;
+    let emailFailed = 0;
+    let emailSkipped = 0;
+
+    if (sendEmailCopy) {
+      const memberMap = new Map(members.map(m => [m.id, m]));
+      const threadList = threads || [];
+
+      for (let i = 0; i < threadList.length; i += 10) {
+        const batch = threadList.slice(i, i + 10);
+        const results = await Promise.all(batch.map(async thread => {
+          const member = memberMap.get(thread.member_id);
+          if (!member) return { status: 'skipped' };
+          return notifyMember(admin, thread, member, body);
+        }));
+
+        results.forEach(result => {
+          if (result?.status === 'sent') emailSent += 1;
+          else if (result?.status === 'failed') emailFailed += 1;
+          else emailSkipped += 1;
+        });
+      }
+    } else {
+      emailSkipped = members.length;
+    }
+
+    await admin.from('audit_log').insert({
+      actor_id: auth.profile.id,
+      action: 'admin_private_message_sent',
+      entity_type: 'support_broadcast',
+      entity_id: null,
+      details: {
+        broadcast_id: broadcastId,
+        audience,
+        recipients: members.length,
+        subject,
+        email_requested: sendEmailCopy,
+        email_sent: emailSent,
+        email_failed: emailFailed,
+        email_skipped: emailSkipped
+      }
+    }).catch(() => {});
+
+    return json(res, 200, {
+      ok: true,
+      broadcastId,
+      recipientCount: members.length,
+      mailboxDelivered: members.length,
+      emailSent,
+      emailFailed,
+      emailSkipped
+    });
+  }
 
   if (action === 'new_thread') {
     if (staff) return json(res, 400, { error: 'Use an existing member thread from Admin Messages.' });
@@ -362,12 +509,31 @@ export async function handleSupportMessage({ req, res, admin }) {
     if (!thread) return json(res, 404, { error: 'Message thread not found.' });
     if (!staff && thread.member_id !== auth.profile.id) return json(res, 403, { error: 'This conversation is private.' });
 
+    const readAt = new Date().toISOString();
+
     await admin
       .from('support_threads')
       .update(staff ? { admin_unread_count: 0 } : { member_unread_count: 0 })
       .eq('id', thread.id);
 
-    return json(res, 200, { ok: true });
+    let messageQuery = admin
+      .from('support_messages')
+      .update({
+        read_at: readAt,
+        read_by: auth.profile.id
+      })
+      .eq('thread_id', thread.id)
+      .is('read_at', null);
+
+    if (staff) {
+      messageQuery = messageQuery.eq('sender_kind', 'member');
+    } else {
+      messageQuery = messageQuery.in('sender_kind', ['admin','system']);
+    }
+
+    await messageQuery;
+
+    return json(res, 200, { ok: true, readAt });
   }
 
   if (action === 'set_status') {

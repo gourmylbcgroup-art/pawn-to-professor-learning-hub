@@ -1,38 +1,30 @@
-Pawn to Professor v1.9.7
-
-3-DAY TRIAL + ONE-YEAR PAYMENTS + ACCOUNTING
+Pawn to Professor v1.9.8
 
 RUN SQL FIRST:
-supabase/v1.9.7-annual-payments-accounting.sql
+supabase/v1.9.8-guides-receipts-admin-messaging.sql
 
 ADD:
-- api/_lib/payment-actions.js
-- payments-accounting.js
-- payments-accounting.css
-- supabase/v1.9.7-annual-payments-accounting.sql
+- activity-experience-v1.9.8.js
+- admin-menu-v1.9.8.js
+- v1.9.8.css
+- supabase/v1.9.8-guides-receipts-admin-messaging.sql
 
 REPLACE:
-- api/security.js
-- api/_lib/security.js
-- api/_lib/mailbox-actions.js
 - member-mailbox.js
+- api/_lib/mailbox-actions.js
+- api/game/create-launch.js
+- play.html
+- play.js
+- play.css
 - index.html
-- vercel.json
 
-KEEP DELETED:
-- api/support/message.js
-- api/admin/approve-registration.js
+DO NOT CHANGE PAYMENT FILES.
 
-NEW:
-- 3-day trials
-- annual paid access
-- payment ledger
-- refunds/corrections without deleting history
-- renewal reminders 30 and 7 days before expiry
-- Excel + CSV accounting export
-- annual access expiry without disabling member account
-
-IMPORTANT:
-Add CRON_SECRET in Vercel for automatic renewal emails.
-
-See SETUP-v1.9.7.md.
+Features:
+- How to Play / How to Use secure downloadable guides
+- Game / Interactive Lesson / Practice Activity types
+- Back + Home + guide controls in launched activities
+- auto-hide/reveal green launch bar
+- Sent / Delivered / Read mailbox receipts
+- Admin direct + selected + Teacher + Learner + All Member messages
+- Admin menu reordered by importance

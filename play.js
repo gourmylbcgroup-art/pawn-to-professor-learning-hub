@@ -5,9 +5,16 @@ const statusMessage = document.getElementById('statusMessage');
 const frame = document.getElementById('gameFrame');
 const titleEl = document.getElementById('playerTitle');
 const retryBtn = document.getElementById('retryBtn');
+const shell = document.getElementById('playerShell');
+const guideBtn = document.getElementById('guideBtn');
+const showBarBtn = document.getElementById('showBarBtn');
+const hideBarBtn = document.getElementById('hideBarBtn');
 
 let loadTimers = [];
 let loadAttempt = 0;
+let barTimer = null;
+let activeGuideResourceId = null;
+let activeClient = null;
 
 function getDeviceId() {
   let value = localStorage.getItem('ptp_device_id');
@@ -23,12 +30,31 @@ function clearLoadTimers() {
   loadTimers = [];
 }
 
+function clearBarTimer() {
+  if (barTimer) clearTimeout(barTimer);
+  barTimer = null;
+}
+
+function setBarHidden(hidden) {
+  shell.classList.toggle('bar-hidden', hidden);
+  showBarBtn.classList.toggle('hidden', !hidden);
+  if (!hidden) scheduleBarAutoHide();
+  else clearBarTimer();
+}
+
+function scheduleBarAutoHide() {
+  clearBarTimer();
+  if (!statusEl.classList.contains('hidden')) return;
+  barTimer = setTimeout(() => setBarHidden(true), 3800);
+}
+
 function setStatus(title, message, { error = false, showRetry = false } = {}) {
   statusEl.classList.remove('hidden');
   statusEl.classList.toggle('error', error);
   statusTitle.textContent = title;
   statusMessage.textContent = message;
   retryBtn.classList.toggle('hidden', !showRetry);
+  setBarHidden(false);
 }
 
 function showError(message) {
@@ -43,22 +69,22 @@ function scheduleLoadingMessages(attempt) {
 
   loadTimers.push(setTimeout(() => {
     if (attempt !== loadAttempt || statusEl.classList.contains('hidden')) return;
-    setStatus('Loading your game…', 'The secure check is complete. Your activity is loading now.');
+    setStatus('Loading your activity…', 'The secure check is complete. Your activity is loading now.');
   }, 700));
 
   loadTimers.push(setTimeout(() => {
     if (attempt !== loadAttempt || statusEl.classList.contains('hidden')) return;
-    setStatus('Almost ready…', 'Large images, audio or game files can take a few extra seconds.');
+    setStatus('Almost ready…', 'Large images, audio or activity files can take a few extra seconds.');
   }, 5000));
 
   loadTimers.push(setTimeout(() => {
     if (attempt !== loadAttempt || statusEl.classList.contains('hidden')) return;
-    setStatus('This game is taking longer than usual…', 'It is still loading. You can wait or press Try again.', { showRetry: true });
+    setStatus('This activity is taking longer than usual…', 'It is still loading. You can wait or press Try again.', { showRetry: true });
   }, 15000));
 
   loadTimers.push(setTimeout(() => {
     if (attempt !== loadAttempt || statusEl.classList.contains('hidden')) return;
-    setStatus('Still loading…', 'The game host is responding slowly. You can keep waiting or try again.', { showRetry: true });
+    setStatus('Still loading…', 'The activity host is responding slowly. You can keep waiting or try again.', { showRetry: true });
   }, 30000));
 }
 
@@ -72,13 +98,65 @@ function addPreconnect(url) {
     link.crossOrigin = 'anonymous';
     link.dataset.ptpPreconnect = origin;
     document.head.appendChild(link);
-  } catch {
-    // Invalid URLs are handled by the secure-launch API.
-  }
+  } catch {}
 }
 
 document.getElementById('backBtn').addEventListener('click', () => {
-  if (history.length > 1) history.back(); else location.href = '/';
+  if (history.length > 1) history.back();
+  else location.href = '/';
+});
+
+document.getElementById('homeBtn').addEventListener('click', () => {
+  location.href = '/';
+});
+
+hideBarBtn.addEventListener('click', () => setBarHidden(true));
+showBarBtn.addEventListener('click', () => setBarHidden(false));
+
+document.addEventListener('pointermove', event => {
+  if (shell.classList.contains('bar-hidden') && event.pointerType !== 'touch' && event.clientY <= 12) {
+    setBarHidden(false);
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !shell.classList.contains('bar-hidden')) setBarHidden(true);
+});
+
+guideBtn.addEventListener('click', async () => {
+  if (!activeGuideResourceId || !activeClient) return;
+
+  const popup = window.open('about:blank','_blank');
+  if (popup) popup.document.write('<p style="font-family:system-ui;padding:2rem">Checking guide access…</p>');
+
+  try {
+    const { data } = await activeClient.auth.getSession();
+    const token = data.session?.access_token || '';
+    const headers = {
+      'Content-Type':'application/json',
+      'Authorization':`Bearer ${token}`
+    };
+
+    const res = await fetch('/api/resource/resolve', {
+      method:'POST',
+      headers,
+      cache:'no-store',
+      body:JSON.stringify({
+        resourceId:activeGuideResourceId,
+        mode:'download',
+        deviceId:getDeviceId()
+      })
+    });
+
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Guide access was denied.');
+
+    if (popup) popup.location.replace(body.url);
+    else window.location.assign(body.url);
+  } catch (err) {
+    if (popup) popup.close();
+    alert(err.message || 'Could not open the guide.');
+  }
 });
 
 retryBtn.addEventListener('click', () => start());
@@ -87,9 +165,13 @@ async function start() {
   loadAttempt += 1;
   const attempt = loadAttempt;
   clearLoadTimers();
+  clearBarTimer();
+  activeGuideResourceId = null;
+  guideBtn.classList.add('hidden');
   retryBtn.classList.add('hidden');
   frame.classList.add('frame-muted');
   frame.removeAttribute('src');
+  setBarHidden(false);
   setStatus('Checking your access…', 'This secure link only works for an authorized account.');
 
   const activityId = new URLSearchParams(location.search).get('activity');
@@ -103,6 +185,7 @@ async function start() {
     const client = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
       auth: { persistSession: true, autoRefreshToken: true }
     });
+    activeClient = client;
 
     const { data } = await client.auth.getSession();
     const token = data.session?.access_token || '';
@@ -123,17 +206,18 @@ async function start() {
 
     titleEl.textContent = body.title || 'Learning Activity';
 
-    // v1.6.8 analytics: count a play only after the secure launch succeeds.
-    // The database RPC derives the exact game title / Year / Grade / Unit.
+    if (body.guideResourceId) {
+      activeGuideResourceId = body.guideResourceId;
+      guideBtn.textContent = body.guideLabel || '📘 How to Use';
+      guideBtn.classList.remove('hidden');
+    }
+
     void client.rpc('log_usage_event', {
       p_event_type: 'game_play',
       p_activity_id: activityId
     }).then(() => {}).catch(() => {});
 
     addPreconnect(body.embedUrl);
-
-    // v1.4.1: make the iframe visible immediately so the browser can paint the
-    // game progressively instead of showing a blank screen until iframe.onload.
     frame.classList.remove('frame-muted');
     scheduleLoadingMessages(attempt);
 
@@ -142,11 +226,12 @@ async function start() {
       clearLoadTimers();
       statusEl.classList.add('hidden');
       retryBtn.classList.add('hidden');
+      scheduleBarAutoHide();
     };
 
     frame.onerror = () => {
       if (attempt !== loadAttempt) return;
-      showError('The game could not be loaded. Please try again.');
+      showError('The activity could not be loaded. Please try again.');
     };
 
     frame.src = body.embedUrl;

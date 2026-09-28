@@ -1,0 +1,106 @@
+/* Pawn to Professor v1.9.8 */
+
+.mailbox-receipt {
+  margin-top:.38em;
+  font-size:.7em;
+  color:var(--chalk-soft);
+  text-align:right;
+}
+
+.mailbox-receipt.read {
+  color:var(--primary);
+  font-weight:800;
+}
+
+.mailbox-admin-compose-modal,
+.v198-guide-modal {
+  position:fixed;
+  inset:0;
+  z-index:14000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(0,0,0,.66);
+}
+
+.mailbox-admin-compose-card,
+.v198-guide-card {
+  width:min(820px,96vw);
+  max-height:92dvh;
+  overflow:auto;
+  padding:1em;
+  border:1px solid rgba(255,255,255,.24);
+  border-radius:18px;
+  background:#073d30;
+  color:#fff;
+  box-shadow:0 24px 70px rgba(0,0,0,.45);
+}
+
+.mailbox-compose-head,
+.v198-modal-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:.7em;
+  margin-bottom:.7em;
+}
+
+.mailbox-compose-head h2,
+.v198-modal-head h2 {
+  margin:0;
+}
+
+.mailbox-compose-head p,
+.v198-modal-head p {
+  margin:.2em 0 0;
+  color:rgba(255,255,255,.72);
+}
+
+.mailbox-admin-compose-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.55em;
+}
+
+.mailbox-admin-compose-grid .wide {
+  grid-column:1 / -1;
+}
+
+.mailbox-admin-compose-grid select[multiple] {
+  min-height:190px;
+}
+
+.mailbox-admin-send-warning {
+  margin:.7em 0;
+  padding:.65em .75em;
+  border-radius:10px;
+  border:1px solid rgba(255,208,74,.28);
+  background:rgba(255,208,74,.10);
+}
+
+.v198-guide-card {
+  width:min(620px,95vw);
+  display:grid;
+  gap:.65em;
+}
+
+.admin-tabs > button[data-v198-group="content"],
+.admin-tabs > button[data-v198-group="system"] {
+  margin-top:.7em;
+}
+
+.admin-tabs > button[data-v198-group="content"]::before,
+.admin-tabs > button[data-v198-group="system"]::before {
+  content:"";
+  position:absolute;
+}
+
+@media (max-width:900px) {
+  .mailbox-admin-compose-grid {
+    grid-template-columns:1fr;
+  }
+
+  .mailbox-admin-compose-grid .wide {
+    grid-column:auto;
+  }
+}

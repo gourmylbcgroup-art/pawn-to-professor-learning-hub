@@ -3,6 +3,7 @@
   --green:#0f5a42;
   --mint:#75e0b3;
   --yellow:#ffd04a;
+  --bar-height:76px;
 }
 * { box-sizing:border-box; }
 html,body {
@@ -15,53 +16,106 @@ html,body {
 }
 body { overflow:hidden; }
 .hidden { display:none !important; }
+
 .player-shell {
+  position:relative;
+  width:100%;
   height:100%;
-  display:grid;
-  grid-template-rows:auto 1fr;
-  background:linear-gradient(180deg,#0e5c43,#072f25);
+  overflow:hidden;
+  background:#072f25;
 }
+
 .player-bar {
-  min-height:74px;
+  position:absolute;
+  inset:0 0 auto 0;
+  height:var(--bar-height);
   display:flex;
   justify-content:space-between;
   align-items:center;
   gap:1rem;
   padding:.8rem 1.1rem;
+  background:linear-gradient(180deg,#0e5c43,#0a4937);
   border-bottom:1px solid rgba(255,255,255,.18);
   box-shadow:0 5px 20px rgba(0,0,0,.18);
-  position:relative;
-  z-index:5;
+  z-index:20;
+  transform:translateY(0);
+  transition:transform .28s ease;
 }
+
+.player-title-block {
+  min-width:0;
+}
+
 .kicker {
   color:var(--yellow);
   font-weight:900;
   letter-spacing:.14em;
   font-size:.72rem;
 }
-h1 { margin:.15rem 0 0; font-size:clamp(1.05rem,2vw,1.55rem); }
-.player-actions { display:flex; gap:.55rem; }
+
+h1 {
+  margin:.15rem 0 0;
+  font-size:clamp(1.05rem,2vw,1.55rem);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.player-actions {
+  display:flex;
+  gap:.45rem;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
 button {
   border:0;
   border-radius:999px;
-  padding:.65rem 1rem;
+  padding:.62rem .92rem;
   font-weight:900;
   background:var(--mint);
   color:#103b30;
   cursor:pointer;
 }
-#backBtn {
+
+button.secondary {
   background:rgba(255,255,255,.13);
   color:#fff;
   border:1px solid rgba(255,255,255,.2);
 }
 
 .game-stage {
-  min-height:0;
-  position:relative;
+  position:absolute;
+  inset:var(--bar-height) 0 0 0;
   overflow:hidden;
   background:#fff;
+  transition:top .28s ease;
 }
+
+.player-shell.bar-hidden .player-bar {
+  transform:translateY(-105%);
+  pointer-events:none;
+}
+
+.player-shell.bar-hidden .game-stage {
+  top:0;
+}
+
+.show-bar-tab {
+  position:fixed;
+  top:0;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:30;
+  padding:.35rem .9rem .42rem;
+  border-radius:0 0 14px 14px;
+  background:rgba(7,61,48,.94);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.24);
+  border-top:0;
+  box-shadow:0 5px 18px rgba(0,0,0,.24);
+}
+
 .game-frame {
   position:absolute;
   inset:0;
@@ -84,6 +138,7 @@ button {
   background:linear-gradient(180deg,rgba(7,47,37,.76),rgba(7,47,37,.50));
   transition:opacity .22s ease;
 }
+
 .status-panel {
   width:min(92vw,540px);
   display:grid;
@@ -98,6 +153,7 @@ button {
   backdrop-filter:blur(7px);
   color:rgba(255,255,255,.88);
 }
+
 .status-panel strong { color:#fff; font-size:1.2rem; }
 .status-overlay.error .status-panel strong { color:#ffd3ce; }
 .status-overlay.error .spinner { display:none; }
@@ -131,13 +187,31 @@ button {
   to { transform:translateX(255%); }
 }
 
-/* The retry button lives in the header, so it remains clickable while the overlay is non-interactive. */
-@media (max-width:700px) {
-  .player-bar { min-height:64px; padding:.65rem .8rem; }
-  .player-actions button { padding:.55rem .78rem; }
+@media (max-width:760px) {
+  :root { --bar-height:104px; }
+  .player-bar {
+    padding:.5rem .65rem;
+    align-items:flex-start;
+    gap:.45rem;
+  }
+  .player-title-block { max-width:36%; }
+  .kicker { font-size:.58rem; }
+  h1 { font-size:.9rem; }
+  .player-actions {
+    max-width:64%;
+    gap:.3rem;
+  }
+  .player-actions button {
+    padding:.45rem .62rem;
+    font-size:.75rem;
+  }
   .status-panel { padding:1.2rem; }
 }
 
 @media (prefers-reduced-motion:reduce) {
-  *,*::before,*::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  *,*::before,*::after {
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
 }
