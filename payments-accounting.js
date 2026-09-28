@@ -661,8 +661,78 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
+
+  // -----------------------------------------------------------------------
+  // v1.9.7a HOTFIX — deterministic Admin Payments tab
+  // Adds the tab directly from the rendered Admin DOM as a fallback.
+  // -----------------------------------------------------------------------
+  function ensurePaymentsTabV197a() {
+    try {
+      if (!state.profile || !['admin','owner'].includes(state.profile.role)) return;
+      if (state.view !== 'admin') return;
+
+      const tabs = els.content.querySelector('.admin-tabs');
+      const panel = els.content.querySelector('#adminPanel');
+      if (!tabs || !panel) return;
+
+      let btn = tabs.querySelector('[data-v197-payments-tab]');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-ghost';
+        btn.dataset.v197PaymentsTab = 'true';
+        btn.textContent = '💰 Payments';
+        tabs.appendChild(btn);
+
+        btn.addEventListener('click', () => {
+          state.adminTab = 'payments';
+
+          tabs.querySelectorAll('button').forEach(node => {
+            node.classList.toggle('active', node === btn);
+          });
+
+          renderAdminPayments(panel);
+        });
+      }
+
+      btn.classList.toggle('active', state.adminTab === 'payments');
+
+      if (state.adminTab === 'payments') {
+        const alreadyRendered =
+          panel.querySelector('.v197-head') ||
+          panel.querySelector('#v197Ledger');
+
+        if (!alreadyRendered) renderAdminPayments(panel);
+      }
+    } catch (err) {
+      console.error('v1.9.7a Payments tab hotfix:', err);
+    }
+  }
+
+  const paymentsTabObserverV197a = new MutationObserver(() => {
+    queueMicrotask(ensurePaymentsTabV197a);
+  });
+
+  function startPaymentsTabHotfixV197a() {
+    if (!els.content) return;
+    paymentsTabObserverV197a.observe(els.content, {
+      childList: true,
+      subtree: true
+    });
+    ensurePaymentsTabV197a();
+    setTimeout(ensurePaymentsTabV197a, 100);
+    setTimeout(ensurePaymentsTabV197a, 500);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startPaymentsTabHotfixV197a, { once: true });
+  } else {
+    startPaymentsTabHotfixV197a();
+  }
+
   globalThis.PTP_PAYMENTS={
-    version:VERSION,
+    version:'1.9.7a',
     openRecordPayment
   };
+  globalThis.PTP_PAYMENTS_TAB_HOTFIX='1.9.7a';
 })();
