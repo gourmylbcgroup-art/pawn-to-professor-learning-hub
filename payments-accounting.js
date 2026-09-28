@@ -4,7 +4,7 @@
 (() => {
   if (typeof state === 'undefined' || typeof render === 'undefined') return;
 
-  const VERSION = '1.9.7';
+  const VERSION = '1.9.7b';
   let paymentData = null;
   let recordSeed = null;
   let refreshTimer = null;
@@ -602,16 +602,27 @@
     paint();
   }
 
-  // Admin tab wrapper
+  // Admin tab wrapper — v1.9.7b stable single Payments tab.
+  // No MutationObserver is used here. This prevents duplicate buttons and
+  // re-entrant accounting renders that could freeze the browser.
   if(typeof renderAdmin==='function'){
     const nativeRenderAdminV197=renderAdmin;
+
     renderAdmin=function(...args){
       nativeRenderAdminV197(...args);
+
       const tabs=els.content.querySelector('.admin-tabs');
       const panel=els.content.querySelector('#adminPanel');
       if(!tabs||!panel)return;
 
-      let btn=[...tabs.querySelectorAll('button')].find(n=>/Payments\s*&\s*Accounting|💰\s*Payments/i.test(n.textContent||''));
+      // Find every Payments-like button and keep exactly one.
+      const matches=[...tabs.querySelectorAll('button')].filter(node =>
+        /Payments\s*&\s*Accounting|💰\s*Payments/i.test(node.textContent||'')
+      );
+
+      let btn=matches[0]||null;
+      matches.slice(1).forEach(node=>node.remove());
+
       if(!btn){
         btn=document.createElement('button');
         btn.type='button';
@@ -620,17 +631,24 @@
         tabs.appendChild(btn);
       }
 
+      btn.dataset.v197PaymentsTab='true';
+
+      // Clone once to guarantee only one click handler.
       const clean=btn.cloneNode(true);
+      clean.dataset.v197PaymentsTab='true';
       clean.classList.toggle('active',state.adminTab==='payments');
       btn.replaceWith(clean);
 
       clean.addEventListener('click',()=>{
+        if(state.adminTab==='payments')return;
         state.adminTab='payments';
         paymentData=null;
         render();
       });
 
-      if(state.adminTab==='payments')renderAdminPayments(panel);
+      if(state.adminTab==='payments'){
+        renderAdminPayments(panel);
+      }
     };
   }
 
@@ -661,78 +679,8 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 
-
-  // -----------------------------------------------------------------------
-  // v1.9.7a HOTFIX — deterministic Admin Payments tab
-  // Adds the tab directly from the rendered Admin DOM as a fallback.
-  // -----------------------------------------------------------------------
-  function ensurePaymentsTabV197a() {
-    try {
-      if (!state.profile || !['admin','owner'].includes(state.profile.role)) return;
-      if (state.view !== 'admin') return;
-
-      const tabs = els.content.querySelector('.admin-tabs');
-      const panel = els.content.querySelector('#adminPanel');
-      if (!tabs || !panel) return;
-
-      let btn = tabs.querySelector('[data-v197-payments-tab]');
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-ghost';
-        btn.dataset.v197PaymentsTab = 'true';
-        btn.textContent = '💰 Payments';
-        tabs.appendChild(btn);
-
-        btn.addEventListener('click', () => {
-          state.adminTab = 'payments';
-
-          tabs.querySelectorAll('button').forEach(node => {
-            node.classList.toggle('active', node === btn);
-          });
-
-          renderAdminPayments(panel);
-        });
-      }
-
-      btn.classList.toggle('active', state.adminTab === 'payments');
-
-      if (state.adminTab === 'payments') {
-        const alreadyRendered =
-          panel.querySelector('.v197-head') ||
-          panel.querySelector('#v197Ledger');
-
-        if (!alreadyRendered) renderAdminPayments(panel);
-      }
-    } catch (err) {
-      console.error('v1.9.7a Payments tab hotfix:', err);
-    }
-  }
-
-  const paymentsTabObserverV197a = new MutationObserver(() => {
-    queueMicrotask(ensurePaymentsTabV197a);
-  });
-
-  function startPaymentsTabHotfixV197a() {
-    if (!els.content) return;
-    paymentsTabObserverV197a.observe(els.content, {
-      childList: true,
-      subtree: true
-    });
-    ensurePaymentsTabV197a();
-    setTimeout(ensurePaymentsTabV197a, 100);
-    setTimeout(ensurePaymentsTabV197a, 500);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startPaymentsTabHotfixV197a, { once: true });
-  } else {
-    startPaymentsTabHotfixV197a();
-  }
-
   globalThis.PTP_PAYMENTS={
-    version:'1.9.7a',
+    version:VERSION,
     openRecordPayment
   };
-  globalThis.PTP_PAYMENTS_TAB_HOTFIX='1.9.7a';
 })();
