@@ -32,7 +32,7 @@
     authJson('/api/security?action=support-message', payload);
 
   const deleteApi = payload =>
-    authJson('/api/security?action=support-message', payload);
+    authJson('/api/mailbox-admin-v1.9.8g', payload);
 
   async function loadThreads() {
     let q = state.client
@@ -315,10 +315,10 @@
     });
 
     panel.querySelector('#v198gDeleteThread').addEventListener('click', async () => {
-      const confirmText = prompt(
-        `Permanently delete this whole conversation and all its messages?\n\nSubject: ${thread.subject}\n\nType DELETE to confirm:`
+      const confirmed = confirm(
+        `Delete this conversation and all messages?\n\nSubject: ${thread.subject}`
       );
-      if (confirmText !== 'DELETE') return;
+      if (!confirmed) return;
 
       try {
         await deleteApi({ action:'delete_thread', threadId:thread.id });

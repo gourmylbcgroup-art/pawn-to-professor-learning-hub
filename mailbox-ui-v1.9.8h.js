@@ -77,10 +77,10 @@
   }
 
   async function deleteThread(threadId, row) {
-    const confirmText = prompt(
-      'Permanently delete this conversation and all of its messages?\n\nType DELETE to confirm:'
+    const confirmed = confirm(
+      'Delete this conversation and all messages?'
     );
-    if (confirmText !== 'DELETE') return;
+    if (!confirmed) return;
 
     const btn = row.querySelector('[data-v198h-delete-thread]');
     if (btn) {
@@ -89,7 +89,7 @@
     }
 
     try {
-      await authJson('/api/security?action=support-message', {
+      await authJson('/api/mailbox-admin-v1.9.8g', {
         action:'delete_thread',
         threadId
       });

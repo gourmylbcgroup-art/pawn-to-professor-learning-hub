@@ -1,32 +1,22 @@
-PAWN TO PROFESSOR — MAILBOX HOBBY-COMPATIBLE UPDATE
+Pawn to Professor — Simple Delete Confirmation v1.9.8i
 
-Replace these 3 files in GitHub:
+This update removes the need to type DELETE.
 
-1. Repository root:
-   mailbox-repair-v1.9.8g.js
+Replace these 2 files in the repository root:
+- mailbox-repair-v1.9.8g.js
+- mailbox-ui-v1.9.8h.js
 
-2. Repository root:
-   mailbox-ui-v1.9.8h.js
+New behavior:
+- Delete Conversation -> normal confirmation popup
+- Cancel / OK
+- Delete Message keeps its normal confirmation popup
 
-3. api/_lib/:
-   mailbox-actions.js
-
-IMPORTANT:
-- Keep api/mailbox-admin-v1.9.8g.js DELETED.
-- Do NOT create a new top-level API function for this mailbox repair.
-- No SQL is required.
+No SQL required.
+No API changes.
+No new Vercel function.
+Compatible with the current Hobby-plan setup.
 
 After upload:
-1. Commit changes.
-2. Wait for Vercel to show Ready.
-3. Hard refresh:
-   Mac: Command + Shift + R
-   Windows: Ctrl + F5
-
-Expected:
-- Admin/Owner Messages works.
-- Delete Message works.
-- Delete Conversation works.
-- Quick delete works from message list.
-- Teacher/Learner remain Admin-only messaging.
-- No extra Vercel serverless function is added.
+1. Commit
+2. Wait for Vercel -> Ready
+3. Hard refresh
