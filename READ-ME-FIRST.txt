@@ -1,58 +1,22 @@
-Pawn to Professor — Manual Paid Unit Release v1.9.8k
+Pawn to Professor — Hide Paid Trial Banner v1.9.8l2
 
-PURPOSE
-Annual paid members remain active for their paid period, but they do NOT automatically receive every Unit.
-Admin manually releases Unit names (Unit 2, Unit 3, etc.) to all active annual paid members.
+WHY v1.9.8l DID NOT ALWAYS WORK
+The first patch relied mainly on PTP_PAYMENT_STATE.active.
+On some render timings, the trial banner was already visible before that state had finished loading.
 
-IMPORTANT
-This patch DOES require one Supabase SQL run because the current v1.9.7 database grants all Units automatically to an active annual paid member.
+THIS FIX IS MORE ROBUST
+It hides the trial banner when either:
+- PTP_PAYMENT_STATE.active === true, OR
+- the visible page contains "One-Year Access Active".
 
-STEP 1 — SUPABASE
-Open Supabase -> SQL Editor.
-Run:
-  supabase/v1.9.8k-manual-paid-unit-release.sql
+UPLOAD
+Replace ONLY this root file:
+  hide-paid-trial-banner-v1.9.8l.js
 
-What SQL does:
-- creates paid_unit_releases
-- seeds Unit 1 as released
-- removes "annual payment = all Units" behavior
-- makes annual access depend on the Unit being released
-- keeps direct user grants and Access Groups unchanged
-- adds secure Admin/Owner RPCs to Release / Re-lock Unit names
+Do not change index.html again.
+The current index already loads this filename.
 
-STEP 2 — GITHUB ROOT
-Upload:
-  paid-unit-release-v1.9.8k.js
-
-STEP 3 — INDEX.HTML
-Add this as the LAST script before </body>:
-  <script src="./paid-unit-release-v1.9.8k.js" defer></script>
-
-STEP 4
-Commit.
-Wait for Vercel -> Ready.
-Hard refresh.
-
-HOW TO USE
-Admin -> Paid Release
-
-Choose:
-  Unit 2
-
-Click:
-  Release to All Active Paid Users
-
-This releases every published Unit named "Unit 2" across all grades and school years.
-
-IMPORTANT BEHAVIOR
-- Unit 1 is released by default.
-- A paid member must still have an active, non-cancelled annual access period.
-- When annual access expires, paid-release access stops automatically.
-- New paid members automatically receive every Unit you previously released.
-- Trial access remains Unit 1 only.
-- Direct/manual user access still works separately.
-- Access Groups still work separately.
-- Re-lock only removes the global paid release; it does not remove direct/group permissions.
-
-NO NEW VERCEL SERVERLESS FUNCTION
-This patch is frontend + Supabase RPC only, so it does not increase the Vercel Hobby function count.
+Then:
+1. Commit
+2. Wait for Vercel Ready
+3. Hard refresh
