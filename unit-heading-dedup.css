@@ -1,0 +1,13 @@
+/* Pawn to Professor v1.9.8e
+   Global fix: remove the duplicated Curriculum Unit heading.
+   The main page title remains visible.
+*/
+
+.unit-teaching-dashboard > .unit-dashboard-title {
+  display: none !important;
+}
+
+/* Remove the now-unneeded gap before the curriculum cards. */
+.unit-teaching-dashboard {
+  padding-top: 0 !important;
+}
