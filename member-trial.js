@@ -190,8 +190,6 @@
     syncRegistrationType();
     syncGuardianFields();
 
-    // Capture phase prevents the older core registration listener from sending
-    // a request without the new member/age/legal fields.
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -232,8 +230,6 @@
         }
       }
 
-      // Refresh legal versions immediately before submission so a newly
-      // published version cannot be silently bypassed.
       try {
         globalThis.PTPLegal?.clearCache?.();
         currentLegalDocs = await globalThis.PTPLegal.requiredDocuments(memberType);
@@ -248,7 +244,6 @@
       const acceptedTypes=new Set(acceptedBoxes.map(x=>x.dataset.legalType));
 
       if(requiredTypes.some(t=>!acceptedTypes.has(t))) {
-        // Re-render because the current legal versions may have changed.
         await renderLegalChecks();
         els.registerMessage.textContent = 'Please review and accept all required Terms and the Privacy Policy.';
         return;
@@ -288,9 +283,6 @@
     }, true);
   }
 
-  // -----------------------------------------------------------------------
-  // 2) Teacher Tools are staff-only for both Teacher and Learner accounts
-  // -----------------------------------------------------------------------
   if (typeof loadExternalTools === 'function') {
     const nativeLoadExternalTools = loadExternalTools;
     loadExternalTools = async function () {
@@ -302,9 +294,6 @@
     };
   }
 
-  // -----------------------------------------------------------------------
-  // 3) Home experience + trial status banner
-  // -----------------------------------------------------------------------
   if (typeof renderYears === 'function') {
     const nativeRenderYearsV18 = renderYears;
     renderYears = function () {
@@ -340,10 +329,6 @@
     };
   }
 
-  // -----------------------------------------------------------------------
-  // 4) Admin registration requests show account type / age details.
-  //    Approval starts the trial via the database trigger.
-  // -----------------------------------------------------------------------
   if (typeof renderAdminRequests === 'function') {
     const nativeRenderAdminRequestsV18 = renderAdminRequests;
     renderAdminRequests = function (panel) {
@@ -366,25 +351,48 @@
           approve.addEventListener('click', async (event) => {
             event.preventDefault();
             event.stopImmediatePropagation();
+
+            if (approve.disabled) return;
             approve.disabled = true;
-            const { error } = await state.client.from('profiles').update({status:'active'}).eq('id', user.id);
-            if (error) {
+            const originalLabel = approve.textContent;
+            approve.textContent = 'Approving…';
+
+            let result;
+            try {
+              const headers = await authHeaders();
+              const res = await fetch('/api/security?action=approve-registration', {
+                method:'POST',
+                headers,
+                cache:'no-store',
+                body:JSON.stringify({ userId:user.id })
+              });
+
+              result = await res.json().catch(() => ({}));
+
+              if (!res.ok) {
+                throw new Error(result.error || 'Could not approve this registration.');
+              }
+            } catch (err) {
               approve.disabled = false;
-              return toast(error.message);
+              approve.textContent = originalLabel;
+              return toast(err.message || 'Could not approve this registration.');
             }
-            await logAudit('registration_approved','profile',user.id,{username:user.username,member_type:user.member_type || 'teacher',trial_days:7});
-            toast(`${user.username} approved. Their 7-day Unit 1 trial has started.`);
-            await loadAdminUsers();
-            render();
+
+            toast(`${user.username} approved successfully.`);
+
+            try {
+              await loadAdminUsers();
+              render();
+            } catch (err) {
+              console.warn('Registration approved, but Admin view refresh failed:', err);
+              toast(`${user.username} approved. Refresh the page to update the list.`);
+            }
           }, true);
         }
       });
     };
   }
 
-  // -----------------------------------------------------------------------
-  // 5) Admin Users & Access: show/change Teacher/Learner + trial dates
-  // -----------------------------------------------------------------------
   if (typeof renderAdminUserPermissions === 'function') {
     const nativeRenderAdminUserPermissionsV18 = renderAdminUserPermissions;
     renderAdminUserPermissions = async function (container, user) {
@@ -428,18 +436,15 @@
     };
   }
 
-  // Keep a visible version marker for troubleshooting without changing UI.
   globalThis.PTP_MEMBER_TRIAL_VERSION = V18;
   installRegistrationFields();
 
-  // If a remembered session finished loading unusually quickly, enforce the
-  // new member experience immediately as well as on the next navigation.
   setTimeout(() => {
     try {
       if (state.profile && !isStaff()) {
         state.tools = [];
         if (state.view === 'years') render();
       }
-    } catch { /* normal startup will apply the same rules */ }
+    } catch {}
   }, 0);
 })();

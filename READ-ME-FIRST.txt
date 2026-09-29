@@ -1,30 +1,19 @@
-Pawn to Professor — Mailbox Fix v1.9.8i2
+Pawn to Professor — Registration Approval Fix v1.9.8j
 
-Cause of the regression:
-The previous simple-delete patch accidentally reintroduced the OLD delete API route:
-  /api/mailbox-admin-v1.9.8g
+Replace ONLY this file in the repository root:
+member-trial.js
 
-That old API file was intentionally deleted to stay within the Vercel Hobby function limit.
-
-This patch restores the correct existing route:
-  /api/security?action=support-message
-
-It also keeps the easier confirmation:
-  Delete this conversation and all messages?
-  Cancel / OK
-
-Replace ONLY these two files in the repository root:
-- mailbox-repair-v1.9.8g.js
-- mailbox-ui-v1.9.8h.js
-
-Do NOT recreate:
-  api/mailbox-admin-v1.9.8g.js
-
-No SQL required.
-No new Vercel function.
+What is fixed:
+- Approve now uses the existing server-side route:
+  /api/security?action=approve-registration
+- User activation, welcome message, email, and trial logic are handled server-side.
+- If the approval succeeds but the Admin screen refresh fails, the UI no longer reports a false approval failure.
+- No new Vercel function.
+- No SQL change.
 
 After upload:
 1. Commit
 2. Wait for Vercel -> Ready
 3. Hard refresh
-4. Test delete again
+4. Register one test account
+5. Admin -> Registration Requests -> Approve
