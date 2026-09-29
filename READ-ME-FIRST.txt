@@ -1,22 +1,30 @@
-Pawn to Professor — Simple Delete Confirmation v1.9.8i
+Pawn to Professor — Mailbox Fix v1.9.8i2
 
-This update removes the need to type DELETE.
+Cause of the regression:
+The previous simple-delete patch accidentally reintroduced the OLD delete API route:
+  /api/mailbox-admin-v1.9.8g
 
-Replace these 2 files in the repository root:
+That old API file was intentionally deleted to stay within the Vercel Hobby function limit.
+
+This patch restores the correct existing route:
+  /api/security?action=support-message
+
+It also keeps the easier confirmation:
+  Delete this conversation and all messages?
+  Cancel / OK
+
+Replace ONLY these two files in the repository root:
 - mailbox-repair-v1.9.8g.js
 - mailbox-ui-v1.9.8h.js
 
-New behavior:
-- Delete Conversation -> normal confirmation popup
-- Cancel / OK
-- Delete Message keeps its normal confirmation popup
+Do NOT recreate:
+  api/mailbox-admin-v1.9.8g.js
 
 No SQL required.
-No API changes.
 No new Vercel function.
-Compatible with the current Hobby-plan setup.
 
 After upload:
 1. Commit
 2. Wait for Vercel -> Ready
 3. Hard refresh
+4. Test delete again

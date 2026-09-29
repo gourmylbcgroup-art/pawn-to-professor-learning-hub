@@ -89,7 +89,7 @@
     }
 
     try {
-      await authJson('/api/mailbox-admin-v1.9.8g', {
+      await authJson('/api/security?action=support-message', {
         action:'delete_thread',
         threadId
       });
