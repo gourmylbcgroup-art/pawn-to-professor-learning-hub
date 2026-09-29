@@ -1,0 +1,32 @@
+PAWN TO PROFESSOR — MAILBOX HOBBY-COMPATIBLE UPDATE
+
+Replace these 3 files in GitHub:
+
+1. Repository root:
+   mailbox-repair-v1.9.8g.js
+
+2. Repository root:
+   mailbox-ui-v1.9.8h.js
+
+3. api/_lib/:
+   mailbox-actions.js
+
+IMPORTANT:
+- Keep api/mailbox-admin-v1.9.8g.js DELETED.
+- Do NOT create a new top-level API function for this mailbox repair.
+- No SQL is required.
+
+After upload:
+1. Commit changes.
+2. Wait for Vercel to show Ready.
+3. Hard refresh:
+   Mac: Command + Shift + R
+   Windows: Ctrl + F5
+
+Expected:
+- Admin/Owner Messages works.
+- Delete Message works.
+- Delete Conversation works.
+- Quick delete works from message list.
+- Teacher/Learner remain Admin-only messaging.
+- No extra Vercel serverless function is added.

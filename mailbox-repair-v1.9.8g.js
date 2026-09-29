@@ -32,7 +32,7 @@
     authJson('/api/security?action=support-message', payload);
 
   const deleteApi = payload =>
-    authJson('/api/mailbox-admin-v1.9.8g', payload);
+    authJson('/api/security?action=support-message', payload);
 
   async function loadThreads() {
     let q = state.client

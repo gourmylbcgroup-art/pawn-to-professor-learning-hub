@@ -536,6 +536,120 @@ export async function handleSupportMessage({ req, res, admin }) {
     return json(res, 200, { ok: true, readAt });
   }
 
+  if (action === 'delete_message') {
+    if (!staff) return json(res, 403, { error: 'Administrator access required.' });
+
+    const messageId = clean(req.body?.messageId, 80);
+    if (!messageId) return json(res, 400, { error: 'Missing message.' });
+
+    const { data: message, error: messageError } = await admin
+      .from('support_messages')
+      .select('id,thread_id,sender_id,sender_kind,created_at')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    if (messageError || !message) {
+      return json(res, 404, { error: 'Message not found.' });
+    }
+
+    const { error: deleteError } = await admin
+      .from('support_messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (deleteError) return json(res, 400, { error: deleteError.message });
+
+    const { data: remaining, error: remainingError } = await admin
+      .from('support_messages')
+      .select('id,created_at')
+      .eq('thread_id', message.thread_id)
+      .order('created_at', { ascending:false })
+      .limit(1);
+
+    if (remainingError) {
+      return json(res, 500, {
+        error: 'Message was deleted, but the conversation could not be refreshed.'
+      });
+    }
+
+    let threadDeleted = false;
+
+    if (!remaining?.length) {
+      const { error: threadDeleteError } = await admin
+        .from('support_threads')
+        .delete()
+        .eq('id', message.thread_id);
+
+      if (threadDeleteError) {
+        return json(res, 400, { error: threadDeleteError.message });
+      }
+      threadDeleted = true;
+    } else {
+      await admin
+        .from('support_threads')
+        .update({ last_message_at: remaining[0].created_at })
+        .eq('id', message.thread_id);
+    }
+
+    await admin.from('audit_log').insert({
+      actor_id: auth.profile.id,
+      action: 'support_message_deleted',
+      entity_type: 'support_message',
+      entity_id: messageId,
+      details: {
+        thread_id: message.thread_id,
+        sender_kind: message.sender_kind
+      }
+    }).catch(() => {});
+
+    return json(res, 200, {
+      ok: true,
+      deletedMessageId: messageId,
+      threadDeleted
+    });
+  }
+
+  if (action === 'delete_thread') {
+    if (!staff) return json(res, 403, { error: 'Administrator access required.' });
+
+    const threadId = clean(req.body?.threadId, 80);
+    if (!threadId) return json(res, 400, { error: 'Missing conversation.' });
+
+    const { data: thread, error: threadError } = await admin
+      .from('support_threads')
+      .select('id,member_id,subject,category')
+      .eq('id', threadId)
+      .maybeSingle();
+
+    if (threadError || !thread) {
+      return json(res, 404, { error: 'Conversation not found.' });
+    }
+
+    const { error: deleteError } = await admin
+      .from('support_threads')
+      .delete()
+      .eq('id', threadId);
+
+    if (deleteError) return json(res, 400, { error: deleteError.message });
+
+    await admin.from('audit_log').insert({
+      actor_id: auth.profile.id,
+      action: 'support_thread_deleted',
+      entity_type: 'support_thread',
+      entity_id: threadId,
+      details: {
+        member_id: thread.member_id,
+        subject: thread.subject,
+        category: thread.category
+      }
+    }).catch(() => {});
+
+    return json(res, 200, {
+      ok: true,
+      deletedThreadId: threadId
+    });
+  }
+
   if (action === 'set_status') {
     if (!staff) return json(res, 403, { error: 'Administrator access required.' });
 
