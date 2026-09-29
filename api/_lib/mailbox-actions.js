@@ -356,7 +356,8 @@ export async function handleSupportMessage({ req, res, admin }) {
       emailSkipped = members.length;
     }
 
-    await admin.from('audit_log').insert({
+    try {
+      await admin.from('audit_log').insert({
       actor_id: auth.profile.id,
       action: 'admin_private_message_sent',
       entity_type: 'support_broadcast',
@@ -371,7 +372,10 @@ export async function handleSupportMessage({ req, res, admin }) {
         email_failed: emailFailed,
         email_skipped: emailSkipped
       }
-    }).catch(() => {});
+    });
+    } catch {
+      // Audit logging must never break the completed mailbox action.
+    }
 
     return json(res, 200, {
       ok: true,
@@ -430,13 +434,17 @@ export async function handleSupportMessage({ req, res, admin }) {
       return json(res, 400, { error: messageError.message });
     }
 
-    await admin.from('audit_log').insert({
+    try {
+      await admin.from('audit_log').insert({
       actor_id: auth.profile.id,
       action: 'support_thread_created',
       entity_type: 'support_thread',
       entity_id: thread.id,
       details: { category, subject }
-    }).catch(() => {});
+    });
+    } catch {
+      // Audit logging must never break the completed mailbox action.
+    }
 
     notifyAdmins(admin, thread, auth.profile, body).catch(() => {});
 
@@ -591,7 +599,8 @@ export async function handleSupportMessage({ req, res, admin }) {
         .eq('id', message.thread_id);
     }
 
-    await admin.from('audit_log').insert({
+    try {
+      await admin.from('audit_log').insert({
       actor_id: auth.profile.id,
       action: 'support_message_deleted',
       entity_type: 'support_message',
@@ -600,7 +609,10 @@ export async function handleSupportMessage({ req, res, admin }) {
         thread_id: message.thread_id,
         sender_kind: message.sender_kind
       }
-    }).catch(() => {});
+    });
+    } catch {
+      // Audit logging must never break the completed mailbox action.
+    }
 
     return json(res, 200, {
       ok: true,
@@ -632,7 +644,8 @@ export async function handleSupportMessage({ req, res, admin }) {
 
     if (deleteError) return json(res, 400, { error: deleteError.message });
 
-    await admin.from('audit_log').insert({
+    try {
+      await admin.from('audit_log').insert({
       actor_id: auth.profile.id,
       action: 'support_thread_deleted',
       entity_type: 'support_thread',
@@ -642,7 +655,10 @@ export async function handleSupportMessage({ req, res, admin }) {
         subject: thread.subject,
         category: thread.category
       }
-    }).catch(() => {});
+    });
+    } catch {
+      // Audit logging must never break the completed mailbox action.
+    }
 
     return json(res, 200, {
       ok: true,
@@ -668,13 +684,17 @@ export async function handleSupportMessage({ req, res, admin }) {
 
     if (error) return json(res, 400, { error: error.message });
 
-    await admin.from('audit_log').insert({
+    try {
+      await admin.from('audit_log').insert({
       actor_id: auth.profile.id,
       action: 'support_status_changed',
       entity_type: 'support_thread',
       entity_id: threadId,
       details: { status }
-    }).catch(() => {});
+    });
+    } catch {
+      // Audit logging must never break the completed mailbox action.
+    }
 
     return json(res, 200, { ok: true });
   }
@@ -870,7 +890,8 @@ You can reply privately through My Messages after signing in.`;
     welcomeError = err?.message || 'Could not create the private welcome message.';
   }
 
-  await admin.from('audit_log').insert({
+  try {
+    await admin.from('audit_log').insert({
     actor_id: auth.profile.id,
     action: 'registration_approved',
     entity_type: 'profile',
@@ -882,7 +903,10 @@ You can reply privately through My Messages after signing in.`;
       welcome_created: welcomeCreated,
       welcome_error: welcomeError
     }
-  }).catch(() => {});
+  });
+  } catch {
+    // Audit logging must never break the completed mailbox action.
+  }
 
   return json(res, 200, {
     ok: true,
