@@ -158,10 +158,19 @@ function stopSecurityMonitor() {
   state.securityMonitor = null;
 }
 
+// v1.9.8o performance state.
+// These caches only reduce duplicate browser requests; they do not change access rules.
+let ptpPublicSettingsLoadedAt = 0;
+let ptpPublicSettingsLoadPromise = null;
+let ptpStructureLoadPromise = null;
+const PTP_PUBLIC_SETTINGS_CACHE_MS = 60000;
+
 async function startSecurityMonitor() {
   stopSecurityMonitor();
   if (isStaff() || !state.settings.member_device_security_enabled) return;
   const check = async () => {
+    if (document.visibilityState === 'hidden') return;
+
     try {
       const headers = await authHeaders();
       const res = await fetch('/api/security/session-status', {
@@ -176,7 +185,7 @@ async function startSecurityMonitor() {
       showLogin(body.error || 'This account is now active on another device. Please sign in again.');
     } catch { /* temporary network problems must not kick a teacher out */ }
   };
-  state.securityMonitor = setInterval(check, 60000);
+  state.securityMonitor = setInterval(check, 600000);
 }
 
 async function boot() {
@@ -202,10 +211,40 @@ async function boot() {
   }
 }
 
-async function loadPublicSettings() {
-  const { data, error } = await state.client.from('portal_settings').select('*').eq('id', 1).maybeSingle();
-  state.settings = { ...DEFAULT_SETTINGS, ...(!error && data ? data : {}) };
-  applyDesign(state.settings);
+async function loadPublicSettings({ force = false } = {}) {
+  const now = Date.now();
+
+  if (
+    !force &&
+    ptpPublicSettingsLoadedAt &&
+    now - ptpPublicSettingsLoadedAt < PTP_PUBLIC_SETTINGS_CACHE_MS
+  ) {
+    applyDesign(state.settings);
+    return state.settings;
+  }
+
+  if (!force && ptpPublicSettingsLoadPromise) {
+    return ptpPublicSettingsLoadPromise;
+  }
+
+  ptpPublicSettingsLoadPromise = (async () => {
+    const { data, error } = await state.client
+      .from('portal_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+
+    state.settings = { ...DEFAULT_SETTINGS, ...(!error && data ? data : {}) };
+    ptpPublicSettingsLoadedAt = Date.now();
+    applyDesign(state.settings);
+    return state.settings;
+  })();
+
+  try {
+    return await ptpPublicSettingsLoadPromise;
+  } finally {
+    ptpPublicSettingsLoadPromise = null;
+  }
 }
 
 function applyDesign(settings) {
@@ -412,15 +451,34 @@ async function enterPortal() {
 }
 
 async function loadStructure() {
-  const [years, grades, units] = await Promise.all([
-    state.client.from('school_years').select('*').eq('archived', false).order('sort_order'),
-    state.client.from('grades').select('*').eq('archived', false).order('sort_order'),
-    state.client.from('units').select('*').eq('is_published', true).order('sort_order')
-  ]);
-  if (years.error || grades.error || units.error) throw years.error || grades.error || units.error;
-  state.years = years.data || [];
-  state.grades = grades.data || [];
-  state.units = units.data || [];
+  if (ptpStructureLoadPromise) return ptpStructureLoadPromise;
+
+  ptpStructureLoadPromise = (async () => {
+    const [years, grades, units] = await Promise.all([
+      state.client.from('school_years').select('*').eq('archived', false).order('sort_order'),
+      state.client.from('grades').select('*').eq('archived', false).order('sort_order'),
+      state.client.from('units').select('*').eq('is_published', true).order('sort_order')
+    ]);
+
+    if (years.error || grades.error || units.error) {
+      throw years.error || grades.error || units.error;
+    }
+
+    state.years = years.data || [];
+    state.grades = grades.data || [];
+    state.units = units.data || [];
+    return {
+      years: state.years,
+      grades: state.grades,
+      units: state.units
+    };
+  })();
+
+  try {
+    return await ptpStructureLoadPromise;
+  } finally {
+    ptpStructureLoadPromise = null;
+  }
 }
 
 async function loadOwnAccess() {
