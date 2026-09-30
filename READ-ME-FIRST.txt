@@ -1,22 +1,60 @@
-Pawn to Professor — Hide Paid Trial Banner v1.9.8l2
+Pawn to Professor v1.9.8m
+Mailbox 100-message limit + Member Self-Delete + Activity Delete
 
-WHY v1.9.8l DID NOT ALWAYS WORK
-The first patch relied mainly on PTP_PAYMENT_STATE.active.
-On some render timings, the trial banner was already visible before that state had finished loading.
+WHAT THIS PATCH DOES
 
-THIS FIX IS MORE ROBUST
-It hides the trial banner when either:
-- PTP_PAYMENT_STATE.active === true, OR
-- the visible page contains "One-Year Access Active".
+1) MEMBER MAILBOX
+- Teacher/Learner accounts may store/send up to 100 of THEIR OWN messages to Admin.
+- Admin/System messages do NOT count toward the 100.
+- A visible counter shows: 42 / 100 messages used.
+- At 100/100, New Message / Send / Reply are disabled.
+- Members can delete ONLY messages that they personally sent.
+- Delete uses: "Delete this message?" -> Cancel / Delete.
+- Deleting a member message immediately frees one message slot.
+- Admin/Owner remains unlimited.
+- Server enforces the 100-message limit, so it cannot be bypassed by the browser.
 
-UPLOAD
-Replace ONLY this root file:
-  hide-paid-trial-banner-v1.9.8l.js
+2) ADMIN ACTIVITIES
+- Adds a red Delete button to each existing Activity.
+- Confirmation is required.
+- Deletes the protected activity_targets row first.
+- Then deletes the Activity.
+- Writes an audit-log entry.
+- Resources are unchanged because Resources already have a working Delete button.
 
-Do not change index.html again.
-The current index already loads this filename.
+FILES TO REPLACE
 
-Then:
-1. Commit
-2. Wait for Vercel Ready
-3. Hard refresh
+Repository root:
+  app.js
+
+Inside:
+  api/_lib/mailbox-actions.js
+
+IMPORTANT
+- No SQL.
+- No new /api file.
+- No new Vercel Serverless Function.
+- Do NOT change index.html for this patch.
+- Keep api/mailbox-admin-v1.9.8g.js deleted.
+
+INSTALL
+1. Replace root app.js.
+2. Replace api/_lib/mailbox-actions.js.
+3. Commit both files.
+4. Wait for Vercel -> Ready.
+5. Hard refresh.
+
+TEST MEMBER MAILBOX
+- Log in as a Teacher/Learner.
+- Open My Messages.
+- Confirm the counter appears.
+- Open a conversation.
+- Confirm only the member's own messages have a Delete button.
+- Delete one: counter should decrease by one.
+- Admin messages must NOT have a member Delete button.
+
+TEST ACTIVITY DELETE
+- Admin -> Activities.
+- Choose Year / Grade / Unit.
+- Existing Activity cards should show Delete.
+- Delete one test Activity and confirm it disappears.

@@ -4,6 +4,27 @@ import { sendEmail, emailConfigured } from './email.js';
 
 
 const PRIMARY_ADMIN_EMAIL = 'stephane@alphagenus.com';
+const MEMBER_MESSAGE_LIMIT = 100;
+
+async function memberSentMessageCount(admin, userId) {
+  const { count, error } = await admin
+    .from('support_messages')
+    .select('*', { count:'exact', head:true })
+    .eq('sender_id', userId)
+    .eq('sender_kind', 'member');
+
+  if (error) throw error;
+  return Number(count || 0);
+}
+
+async function enforceMemberMessageLimit(admin, userId) {
+  const used = await memberSentMessageCount(admin, userId);
+  return {
+    used,
+    limit: MEMBER_MESSAGE_LIMIT,
+    allowed: used < MEMBER_MESSAGE_LIMIT
+  };
+}
 
 function clean(value, max = 8000) {
   return String(value || '').trim().slice(0, max);
@@ -402,6 +423,15 @@ export async function handleSupportMessage({ req, res, admin }) {
     if (subject.length < 3) return json(res, 400, { error: 'Add a short subject.' });
     if (!body) return json(res, 400, { error: 'Write a message before sending.' });
 
+    const quota = await enforceMemberMessageLimit(admin, auth.profile.id);
+    if (!quota.allowed) {
+      return json(res, 429, {
+        error: `You have used all ${MEMBER_MESSAGE_LIMIT} messages. Delete one of your sent messages to send another.`,
+        messageLimit: MEMBER_MESSAGE_LIMIT,
+        messagesUsed: quota.used
+      });
+    }
+
     const { data: thread, error: threadError } = await admin
       .from('support_threads')
       .insert({
@@ -464,6 +494,17 @@ export async function handleSupportMessage({ req, res, admin }) {
 
     if (threadError || !thread) return json(res, 404, { error: 'Message thread not found.' });
     if (!staff && thread.member_id !== auth.profile.id) return json(res, 403, { error: 'This conversation is private.' });
+
+    if (!staff) {
+      const quota = await enforceMemberMessageLimit(admin, auth.profile.id);
+      if (!quota.allowed) {
+        return json(res, 429, {
+          error: `You have used all ${MEMBER_MESSAGE_LIMIT} messages. Delete one of your sent messages to send another.`,
+          messageLimit: MEMBER_MESSAGE_LIMIT,
+          messagesUsed: quota.used
+        });
+      }
+    }
 
     const senderKind = staff ? 'admin' : 'member';
     const { error: messageError } = await admin
@@ -545,19 +586,40 @@ export async function handleSupportMessage({ req, res, admin }) {
   }
 
   if (action === 'delete_message') {
-    if (!staff) return json(res, 403, { error: 'Administrator access required.' });
-
     const messageId = clean(req.body?.messageId, 80);
     if (!messageId) return json(res, 400, { error: 'Missing message.' });
 
     const { data: message, error: messageError } = await admin
       .from('support_messages')
-      .select('id,thread_id,sender_id,sender_kind,created_at')
+      .select('id,thread_id,sender_id,sender_kind,created_at,read_at')
       .eq('id', messageId)
       .maybeSingle();
 
     if (messageError || !message) {
       return json(res, 404, { error: 'Message not found.' });
+    }
+
+    const { data: thread, error: threadError } = await admin
+      .from('support_threads')
+      .select('id,member_id,subject,category')
+      .eq('id', message.thread_id)
+      .maybeSingle();
+
+    if (threadError || !thread) {
+      return json(res, 404, { error: 'Conversation not found.' });
+    }
+
+    // Admin/Owner may delete any mailbox message.
+    // Normal members may delete ONLY a message that they personally sent.
+    if (!staff) {
+      const ownsThread = thread.member_id === auth.profile.id;
+      const ownsMessage = message.sender_id === auth.profile.id && message.sender_kind === 'member';
+
+      if (!ownsThread || !ownsMessage) {
+        return json(res, 403, {
+          error: 'You can delete only messages that you sent.'
+        });
+      }
     }
 
     const { error: deleteError } = await admin
@@ -569,10 +631,9 @@ export async function handleSupportMessage({ req, res, admin }) {
 
     const { data: remaining, error: remainingError } = await admin
       .from('support_messages')
-      .select('id,created_at')
+      .select('id,created_at,sender_kind,read_at')
       .eq('thread_id', message.thread_id)
-      .order('created_at', { ascending:false })
-      .limit(1);
+      .order('created_at', { ascending:false });
 
     if (remainingError) {
       return json(res, 500, {
@@ -593,31 +654,53 @@ export async function handleSupportMessage({ req, res, admin }) {
       }
       threadDeleted = true;
     } else {
+      const adminUnread = remaining.filter(
+        m => m.sender_kind === 'member' && !m.read_at
+      ).length;
+
+      const memberUnread = remaining.filter(
+        m => ['admin','system'].includes(m.sender_kind) && !m.read_at
+      ).length;
+
       await admin
         .from('support_threads')
-        .update({ last_message_at: remaining[0].created_at })
+        .update({
+          last_message_at: remaining[0].created_at,
+          admin_unread_count: adminUnread,
+          member_unread_count: memberUnread
+        })
         .eq('id', message.thread_id);
     }
 
     try {
       await admin.from('audit_log').insert({
-      actor_id: auth.profile.id,
-      action: 'support_message_deleted',
-      entity_type: 'support_message',
-      entity_id: messageId,
-      details: {
-        thread_id: message.thread_id,
-        sender_kind: message.sender_kind
-      }
-    });
+        actor_id: auth.profile.id,
+        action: staff ? 'support_message_deleted' : 'member_support_message_deleted',
+        entity_type: 'support_message',
+        entity_id: messageId,
+        details: {
+          thread_id: message.thread_id,
+          sender_kind: message.sender_kind,
+          deleted_by_role: auth.profile.role
+        }
+      });
     } catch {
-      // Audit logging must never break the completed mailbox action.
+      // Audit logging must never break a completed delete.
+    }
+
+    let messagesUsed = null;
+    if (!staff) {
+      try {
+        messagesUsed = await memberSentMessageCount(admin, auth.profile.id);
+      } catch {}
     }
 
     return json(res, 200, {
       ok: true,
       deletedMessageId: messageId,
-      threadDeleted
+      threadDeleted,
+      messagesUsed,
+      messageLimit: MEMBER_MESSAGE_LIMIT
     });
   }
 

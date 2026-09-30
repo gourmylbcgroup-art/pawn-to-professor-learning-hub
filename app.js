@@ -1078,7 +1078,7 @@ async function loadManagedActivities(panel) {
     const mode=target?.security_mode||'not configured';
     const card=document.createElement('div'); card.className='manage-card';
     const gateStatus=target?.gate_installed?'🟢 Game Gate':'🟡 Gate not confirmed';
-    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)} · ${gateStatus}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-notify>Email Members</button><button class="btn btn-small btn-ghost" data-gate>${target?.gate_installed?'Mark Gate Missing':'Mark Gate Installed'}</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button></div>`;
+    card.innerHTML=`<div><strong>${escapeHtml(a.title)}</strong><div class="meta">${escapeHtml(a.type)} · ${a.published?'Published':'Hidden'} · 🔐 ${escapeHtml(mode)} · ${gateStatus}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-edit>Edit</button><button class="btn btn-small btn-ghost" data-notify>Email Members</button><button class="btn btn-small btn-ghost" data-gate>${target?.gate_installed?'Mark Gate Missing':'Mark Gate Installed'}</button><button class="btn btn-small btn-ghost" data-copy>Duplicate</button><select data-move style="width:auto;margin:0;padding:.35em .5em"><option value="">Move…</option>${allUnitOptions(a.unit_id)}</select><button class="btn btn-small btn-ghost" data-toggle>${a.published?'Hide':'Show'}</button><button class="btn btn-small btn-danger" data-delete>Delete</button></div>`;
     card.querySelector('[data-edit]').addEventListener('click',async()=>{
       const title=prompt('Activity title',a.title); if(title===null||!title.trim())return;
       const url=prompt('Real game URL (Admin only)',target?.target_url||''); if(url===null||!url.trim())return;
@@ -1111,6 +1111,16 @@ async function loadManagedActivities(panel) {
       const {error:moveError}=await state.client.from('activities').update({unit_id:moveTo}).eq('id',a.id); if(moveError)toast(moveError.message);else{await logAudit('activity_moved','activity',a.id,{to:moveTo});toast('Activity moved.');loadManagedActivities(panel);}
     });
     card.querySelector('[data-toggle]').addEventListener('click',async()=>{ const {error:e}=await state.client.from('activities').update({published:!a.published}).eq('id',a.id); if(e)toast(e.message);else{await logAudit('activity_visibility_changed','activity',a.id,{published:!a.published});toast(a.published?'Activity hidden.':'Activity published.');loadManagedActivities(panel);} });
+    card.querySelector('[data-delete]').addEventListener('click',async()=>{
+      if(!confirm(`Permanently delete ${a.title}?\n\nThis removes the activity and its protected launch target.`))return;
+      const {error:targetDeleteError}=await state.client.from('activity_targets').delete().eq('activity_id',a.id);
+      if(targetDeleteError)return toast(targetDeleteError.message);
+      const {error:activityDeleteError}=await state.client.from('activities').delete().eq('id',a.id);
+      if(activityDeleteError)return toast(activityDeleteError.message);
+      await logAudit('secure_activity_deleted','activity',a.id,{title:a.title,unit_id:a.unit_id});
+      toast('Activity deleted.');
+      loadManagedActivities(panel);
+    });
     list.appendChild(card);
   });
 }
@@ -1704,5 +1714,226 @@ async function renderAdminCommunity(panel) {
   panel.querySelector('#addCommunityCategory').addEventListener('click',async()=>{const name=panel.querySelector('#newCommunityName').value.trim();if(!name)return toast('Add a category name.');const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');const row={name,slug:slug||`category-${Date.now()}`,icon:panel.querySelector('#newCommunityIcon').value.trim()||'💬',description:panel.querySelector('#newCommunityDescription').value.trim()||null,staff_only_post:panel.querySelector('#newCommunityStaff').value==='true',enabled:true,sort_order:100};const {error}=await state.client.from('forum_categories').insert(row);if(error)return toast(error.message);await logAudit('forum_category_created','forum_category',null,{name});renderAdminCommunity(panel);});
   const {data,error}=await state.client.from('forum_categories').select('*').order('sort_order');if(state.adminTab!=='communityAdmin')return;const list=panel.querySelector('#communityCategoryAdmin');if(error){list.textContent=error.message;return;}list.innerHTML='';(data||[]).forEach(cat=>{const card=document.createElement('div');card.className='manage-card';card.innerHTML=`<div><strong>${escapeHtml(cat.icon)} ${escapeHtml(cat.name)}</strong><div class="meta">${cat.enabled?'Enabled':'Disabled'} · ${cat.staff_only_post?'Admin posts only':'Members can post'}</div></div><div class="actions"><button class="btn btn-small btn-ghost" data-enabled>${cat.enabled?'Disable':'Enable'}</button><button class="btn btn-small btn-ghost" data-staff>${cat.staff_only_post?'Allow Members':'Admin Only'}</button></div>`;card.querySelector('[data-enabled]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_categories').update({enabled:!cat.enabled}).eq('id',cat.id);if(e)toast(e.message);else renderAdminCommunity(panel);});card.querySelector('[data-staff]').addEventListener('click',async()=>{const {error:e}=await state.client.from('forum_categories').update({staff_only_post:!cat.staff_only_post}).eq('id',cat.id);if(e)toast(e.message);else renderAdminCommunity(panel);});list.appendChild(card);});
 }
+
+
+// ---------------------------------------------------------------------------
+// v1.9.8m — Member mailbox quota + self-delete controls.
+// Backend enforcement lives in api/_lib/mailbox-actions.js.
+// ---------------------------------------------------------------------------
+const PTP_MEMBER_MESSAGE_LIMIT = 100;
+let ptpMemberMailboxThreadId = null;
+let ptpMailboxEnhanceTimer = null;
+let ptpMailboxEnhancing = false;
+
+async function ptpMemberMessagesUsed() {
+  if (!state?.session?.user?.id) return 0;
+
+  const { count, error } = await state.client
+    .from('support_messages')
+    .select('*', { count:'exact', head:true })
+    .eq('sender_id', state.session.user.id)
+    .eq('sender_kind', 'member');
+
+  if (error) throw error;
+  return Number(count || 0);
+}
+
+async function ptpMailboxApi(payload) {
+  const headers = await authHeaders();
+  const res = await fetch('/api/security?action=support-message', {
+    method:'POST',
+    headers,
+    cache:'no-store',
+    body:JSON.stringify(payload)
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Message action failed.');
+  return body;
+}
+
+async function ptpResolveMemberThreadId() {
+  if (ptpMemberMailboxThreadId) return ptpMemberMailboxThreadId;
+
+  const subject = els.content
+    .querySelector('.mailbox-thread-head h3')
+    ?.textContent
+    ?.trim();
+
+  if (!subject || !state?.session?.user?.id) return null;
+
+  const { data, error } = await state.client
+    .from('support_threads')
+    .select('id,subject,last_message_at')
+    .eq('member_id', state.session.user.id)
+    .eq('subject', subject)
+    .order('last_message_at', { ascending:false })
+    .limit(1);
+
+  if (error || !data?.length) return null;
+  ptpMemberMailboxThreadId = data[0].id;
+  return ptpMemberMailboxThreadId;
+}
+
+function ptpPaintQuota(used) {
+  const host =
+    els.content.querySelector('.mailbox-toolbar') ||
+    els.content.querySelector('.mailbox-thread-head');
+
+  if (!host) return;
+
+  let badge = els.content.querySelector('[data-ptp-mailbox-quota]');
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.dataset.ptpMailboxQuota = 'true';
+    badge.className = 'admin-note';
+    badge.style.marginTop = '.35rem';
+    host.appendChild(badge);
+  }
+
+  badge.textContent = `${used} / ${PTP_MEMBER_MESSAGE_LIMIT} messages used`;
+
+  const full = used >= PTP_MEMBER_MESSAGE_LIMIT;
+  badge.style.fontWeight = full ? '700' : '';
+  badge.title = full
+    ? 'Delete one of your sent messages to send another.'
+    : `${PTP_MEMBER_MESSAGE_LIMIT - used} messages remaining.`;
+
+  ['mailboxNewMessage','mailboxSendCompose','mailboxSendReply'].forEach(id => {
+    const btn = els.content.querySelector(`#${id}`);
+    if (!btn) return;
+    btn.disabled = full;
+    if (full) btn.title = 'Delete one of your sent messages to send another.';
+  });
+
+  const composeOrReply =
+    els.content.querySelector('.mailbox-compose') ||
+    els.content.querySelector('.mailbox-reply');
+
+  let warning = els.content.querySelector('[data-ptp-mailbox-limit-warning]');
+  if (full && composeOrReply) {
+    if (!warning) {
+      warning = document.createElement('div');
+      warning.dataset.ptpMailboxLimitWarning = 'true';
+      warning.className = 'mailbox-safety-note';
+      warning.textContent =
+        'You have used all 100 messages. Delete one of your sent messages to send another.';
+      composeOrReply.prepend(warning);
+    }
+  } else {
+    warning?.remove();
+  }
+}
+
+async function ptpAddMemberDeleteButtons() {
+  const threadId = await ptpResolveMemberThreadId();
+  if (!threadId) return;
+
+  const { data: messages, error } = await state.client
+    .from('support_messages')
+    .select('id,thread_id,sender_id,sender_kind,created_at')
+    .eq('thread_id', threadId)
+    .order('created_at');
+
+  if (error) return;
+
+  const articles = [...els.content.querySelectorAll('.mailbox-messages .mailbox-message')];
+  if (!articles.length || articles.length !== (messages || []).length) return;
+
+  (messages || []).forEach((message, index) => {
+    if (
+      message.sender_kind !== 'member' ||
+      message.sender_id !== state.session.user.id
+    ) return;
+
+    const article = articles[index];
+    if (!article || article.querySelector('[data-ptp-member-delete]')) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-small btn-danger';
+    btn.dataset.ptpMemberDelete = message.id;
+    btn.textContent = '🗑 Delete';
+    btn.style.marginTop = '.45rem';
+
+    btn.addEventListener('click', async e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!confirm('Delete this message?')) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+
+      try {
+        const result = await ptpMailboxApi({
+          action:'delete_message',
+          messageId:message.id
+        });
+
+        if (result.threadDeleted) ptpMemberMailboxThreadId = null;
+        toast('Message deleted. One message slot is available again.');
+        render();
+      } catch (err) {
+        toast(err.message);
+        btn.disabled = false;
+        btn.textContent = '🗑 Delete';
+      }
+    });
+
+    article.appendChild(btn);
+  });
+}
+
+async function ptpEnhanceMemberMailbox() {
+  if (ptpMailboxEnhancing) return;
+  if (
+    state?.view !== 'mailbox' ||
+    !state?.profile ||
+    state.profile.role !== 'user' ||
+    (typeof isStaff === 'function' && isStaff())
+  ) return;
+
+  ptpMailboxEnhancing = true;
+  try {
+    const used = await ptpMemberMessagesUsed();
+    ptpPaintQuota(used);
+
+    if (els.content.querySelector('.mailbox-thread-head')) {
+      await ptpAddMemberDeleteButtons();
+    }
+  } catch {
+    // Mailbox enhancement must never block the normal mailbox.
+  } finally {
+    ptpMailboxEnhancing = false;
+  }
+}
+
+function ptpScheduleMailboxEnhance() {
+  clearTimeout(ptpMailboxEnhanceTimer);
+  ptpMailboxEnhanceTimer = setTimeout(ptpEnhanceMemberMailbox, 30);
+}
+
+// Remember the selected member thread before member-mailbox.js handles the click.
+els.content.addEventListener('click', e => {
+  const threadButton = e.target.closest?.('[data-thread-id]');
+  if (threadButton?.dataset?.threadId) {
+    ptpMemberMailboxThreadId = threadButton.dataset.threadId;
+  }
+
+  if (e.target.closest?.('#mailboxNewMessage')) {
+    ptpMemberMailboxThreadId = null;
+  }
+
+  if (e.target.closest?.('#mailboxBackToList')) {
+    ptpMemberMailboxThreadId = null;
+  }
+}, true);
+
+const ptpMailboxObserver = new MutationObserver(ptpScheduleMailboxEnhance);
+ptpMailboxObserver.observe(els.content, {
+  childList:true,
+  subtree:true
+});
+
 
 boot();
