@@ -1,60 +1,55 @@
-Pawn to Professor v1.9.8m
-Mailbox 100-message limit + Member Self-Delete + Activity Delete
+Pawn to Professor v1.9.8n — Conservative Performance Patch
 
-WHAT THIS PATCH DOES
+PURPOSE
+Reduce background traffic and duplicate mailbox work without changing
+payments, permissions, paid Unit release, mailbox limits, or Vercel functions.
 
-1) MEMBER MAILBOX
-- Teacher/Learner accounts may store/send up to 100 of THEIR OWN messages to Admin.
-- Admin/System messages do NOT count toward the 100.
-- A visible counter shows: 42 / 100 messages used.
-- At 100/100, New Message / Send / Reply are disabled.
-- Members can delete ONLY messages that they personally sent.
-- Delete uses: "Delete this message?" -> Cancel / Delete.
-- Deleting a member message immediately frees one message slot.
-- Admin/Owner remains unlimited.
-- Server enforces the 100-message limit, so it cannot be bypassed by the browser.
+CHANGES
 
-2) ADMIN ACTIVITIES
-- Adds a red Delete button to each existing Activity.
-- Confirmation is required.
-- Deletes the protected activity_targets row first.
-- Then deletes the Activity.
-- Writes an audit-log entry.
-- Resources are unchanged because Resources already have a working Delete button.
+1. Device security check
+   Before: every 30 seconds
+   Now:    every 60 seconds
 
-FILES TO REPLACE
+   Example with 30 simultaneous members:
+   Before: about 60 session-status requests/minute
+   Now:    about 30 session-status requests/minute
 
-Repository root:
-  app.js
+   The one-device security rule remains active.
 
-Inside:
-  api/_lib/mailbox-actions.js
+2. Mailbox quota counter
+   The 100-message count is cached for 5 seconds so DOM redraws do not
+   repeatedly query Supabase.
 
-IMPORTANT
-- No SQL.
-- No new /api file.
-- No new Vercel Serverless Function.
-- Do NOT change index.html for this patch.
-- Keep api/mailbox-admin-v1.9.8g.js deleted.
+3. Mailbox delete controls
+   If delete buttons are already installed, the browser does not re-query
+   the same conversation just because the DOM changed.
+
+4. Mailbox observer
+   It now ignores page mutations unless the user is actually inside
+   My Messages, and uses a slightly longer debounce.
+
+WHAT IS NOT CHANGED
+- 100-message limit
+- Member self-delete rules
+- Admin/Owner mailbox behavior
+- Payments
+- Annual access
+- Paid Unit Release
+- Activity Delete
+- Resources
+- Device single-login rule
+- Vercel API/function count
 
 INSTALL
-1. Replace root app.js.
-2. Replace api/_lib/mailbox-actions.js.
-3. Commit both files.
-4. Wait for Vercel -> Ready.
-5. Hard refresh.
+Replace ONLY the repository-root file:
+  app.js
 
-TEST MEMBER MAILBOX
-- Log in as a Teacher/Learner.
-- Open My Messages.
-- Confirm the counter appears.
-- Open a conversation.
-- Confirm only the member's own messages have a Delete button.
-- Delete one: counter should decrease by one.
-- Admin messages must NOT have a member Delete button.
+Then:
+1. Commit
+2. Wait for Vercel -> Ready
+3. Hard refresh
+4. Test login, My Messages, Delete Message, and Activities
 
-TEST ACTIVITY DELETE
-- Admin -> Activities.
-- Choose Year / Grade / Unit.
-- Existing Activity cards should show Delete.
-- Delete one test Activity and confirm it disappears.
+NO SQL.
+NO NEW /api FILE.
+NO NEW VERCEL SERVERLESS FUNCTION.

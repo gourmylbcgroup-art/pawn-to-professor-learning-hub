@@ -176,7 +176,7 @@ async function startSecurityMonitor() {
       showLogin(body.error || 'This account is now active on another device. Please sign in again.');
     } catch { /* temporary network problems must not kick a teacher out */ }
   };
-  state.securityMonitor = setInterval(check, 30000);
+  state.securityMonitor = setInterval(check, 60000);
 }
 
 async function boot() {
@@ -1724,18 +1724,40 @@ const PTP_MEMBER_MESSAGE_LIMIT = 100;
 let ptpMemberMailboxThreadId = null;
 let ptpMailboxEnhanceTimer = null;
 let ptpMailboxEnhancing = false;
+let ptpMailboxQuotaCache = {
+  userId: null,
+  used: 0,
+  at: 0
+};
 
-async function ptpMemberMessagesUsed() {
-  if (!state?.session?.user?.id) return 0;
+async function ptpMemberMessagesUsed({ force = false } = {}) {
+  const userId = state?.session?.user?.id;
+  if (!userId) return 0;
+
+  const now = Date.now();
+  if (
+    !force &&
+    ptpMailboxQuotaCache.userId === userId &&
+    now - ptpMailboxQuotaCache.at < 5000
+  ) {
+    return ptpMailboxQuotaCache.used;
+  }
 
   const { count, error } = await state.client
     .from('support_messages')
     .select('*', { count:'exact', head:true })
-    .eq('sender_id', state.session.user.id)
+    .eq('sender_id', userId)
     .eq('sender_kind', 'member');
 
   if (error) throw error;
-  return Number(count || 0);
+
+  const used = Number(count || 0);
+  ptpMailboxQuotaCache = {
+    userId,
+    used,
+    at: now
+  };
+  return used;
 }
 
 async function ptpMailboxApi(payload) {
@@ -1828,6 +1850,18 @@ async function ptpAddMemberDeleteButtons() {
   const threadId = await ptpResolveMemberThreadId();
   if (!threadId) return;
 
+  const ownRenderedMessages = [
+    ...els.content.querySelectorAll('.mailbox-messages .mailbox-message.member')
+  ];
+  if (
+    ownRenderedMessages.length &&
+    ownRenderedMessages.every(article =>
+      article.querySelector('[data-ptp-member-delete]')
+    )
+  ) {
+    return;
+  }
+
   const { data: messages, error } = await state.client
     .from('support_messages')
     .select('id,thread_id,sender_id,sender_kind,created_at')
@@ -1871,6 +1905,17 @@ async function ptpAddMemberDeleteButtons() {
         });
 
         if (result.threadDeleted) ptpMemberMailboxThreadId = null;
+
+        if (Number.isFinite(Number(result.messagesUsed))) {
+          ptpMailboxQuotaCache = {
+            userId: state.session.user.id,
+            used: Number(result.messagesUsed),
+            at: Date.now()
+          };
+        } else {
+          ptpMailboxQuotaCache.at = 0;
+        }
+
         toast('Message deleted. One message slot is available again.');
         render();
       } catch (err) {
@@ -1909,8 +1954,9 @@ async function ptpEnhanceMemberMailbox() {
 }
 
 function ptpScheduleMailboxEnhance() {
+  if (state?.view !== 'mailbox') return;
   clearTimeout(ptpMailboxEnhanceTimer);
-  ptpMailboxEnhanceTimer = setTimeout(ptpEnhanceMemberMailbox, 30);
+  ptpMailboxEnhanceTimer = setTimeout(ptpEnhanceMemberMailbox, 120);
 }
 
 // Remember the selected member thread before member-mailbox.js handles the click.
@@ -1929,7 +1975,9 @@ els.content.addEventListener('click', e => {
   }
 }, true);
 
-const ptpMailboxObserver = new MutationObserver(ptpScheduleMailboxEnhance);
+const ptpMailboxObserver = new MutationObserver(() => {
+  if (state?.view === 'mailbox') ptpScheduleMailboxEnhance();
+});
 ptpMailboxObserver.observe(els.content, {
   childList:true,
   subtree:true
