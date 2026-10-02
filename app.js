@@ -1255,6 +1255,9 @@ function renderAdminStructure(panel) {
   const {yearOptions}=buildHierarchyOptions();
   panel.innerHTML=`
     <h2>Content Structure</h2><p class="admin-note">Add, rename, duplicate or archive years and grades. Add, duplicate, edit or hide units. Archived content stays in the database.</p>
+    <div class="button-row" style="margin-bottom:.7em">
+      <button id="createPhonicsUnits" class="btn btn-accent" type="button">🔤 Create Unit Phonics in Grade 1 + Grade 2</button>
+    </div>
     <div class="admin-form-grid"><label>New year<input id="newYear" placeholder="2027"></label><div style="display:flex;align-items:end"><button id="addYear" class="btn btn-accent">+ Year</button></div></div>
     <hr class="soft">
     <div class="admin-form-grid"><label>Year<select id="structureYear">${yearOptions}</select></label><label>New grade<input id="newGrade" placeholder="Grade 3"></label><div class="wide"><button id="addGrade" class="btn btn-accent">+ Grade</button></div></div>
@@ -1266,6 +1269,78 @@ function renderAdminStructure(panel) {
   const unitYear=panel.querySelector('#unitYear'), unitGrade=panel.querySelector('#unitGrade');
   const fillUnitGrades=()=>{unitGrade.innerHTML=state.grades.filter(g=>g.school_year_id===unitYear.value).map(g=>`<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');};
   unitYear.addEventListener('change',fillUnitGrades); fillUnitGrades();
+
+  panel.querySelector('#createPhonicsUnits')?.addEventListener('click', async () => {
+    const schoolYearId = unitYear.value;
+    if (!schoolYearId) return toast('Choose the school year first.');
+
+    const normalise = value => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g,' ');
+
+    const grade1 = state.grades.find(g =>
+      g.school_year_id === schoolYearId &&
+      ['grade 1','grade1'].includes(normalise(g.name))
+    );
+
+    const grade2 = state.grades.find(g =>
+      g.school_year_id === schoolYearId &&
+      ['grade 2','grade2'].includes(normalise(g.name))
+    );
+
+    if (!grade1 || !grade2) {
+      const missing = [
+        !grade1 ? 'Grade 1' : null,
+        !grade2 ? 'Grade 2' : null
+      ].filter(Boolean).join(' and ');
+      return toast(`${missing} was not found in the selected school year.`);
+    }
+
+    if (!confirm(
+      `Create "Unit Phonics" in Grade 1 and Grade 2 for the selected school year?\n\nNo activity/link will be added.`
+    )) return;
+
+    const rows = [
+      { grade_id: grade1.id, name:'Unit Phonics', title:'Phonics', sort_order:99, is_published:true },
+      { grade_id: grade2.id, name:'Unit Phonics', title:'Phonics', sort_order:99, is_published:true }
+    ];
+
+    const existing = state.units.filter(u =>
+      rows.some(r => r.grade_id === u.grade_id && normalise(u.name) === 'unit phonics')
+    );
+
+    const toCreate = rows.filter(r =>
+      !existing.some(u => u.grade_id === r.grade_id)
+    );
+
+    if (!toCreate.length) {
+      return toast('Unit Phonics already exists in Grade 1 and Grade 2.');
+    }
+
+    const { data, error } = await state.client
+      .from('units')
+      .insert(toCreate)
+      .select();
+
+    if (error) return toast(error.message);
+
+    for (const unit of data || []) {
+      await logAudit('unit_created','unit',unit.id,{
+        name:'Unit Phonics',
+        grade_id:unit.grade_id,
+        source:'v1.9.8p_phonics_setup'
+      });
+    }
+
+    await loadStructure();
+    toast(
+      toCreate.length === 2
+        ? 'Unit Phonics created in Grade 1 and Grade 2.'
+        : 'Missing Unit Phonics created. Existing one was kept.'
+    );
+    render();
+  });
   panel.querySelector('#addYear').addEventListener('click',async()=>{ const name=panel.querySelector('#newYear').value.trim(); if(!name)return; const {data,error}=await state.client.from('school_years').insert({name,sort_order:Number(name)||9999,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('year_created','year',data.id,{name});await adminStructureRefresh('Year added.');} });
   panel.querySelector('#addGrade').addEventListener('click',async()=>{ const name=panel.querySelector('#newGrade').value.trim(),school_year_id=panel.querySelector('#structureYear').value; if(!name||!school_year_id)return; const order=Number((name.match(/\d+/)||['99'])[0]); const {data,error}=await state.client.from('grades').insert({school_year_id,name,sort_order:order,archived:false}).select().single(); if(error)toast(error.message);else{await logAudit('grade_created','grade',data.id,{name});await adminStructureRefresh('Grade added.');} });
   panel.querySelector('#addUnit').addEventListener('click',async()=>{ const grade_id=unitGrade.value,name=panel.querySelector('#newUnitName').value.trim(),title=panel.querySelector('#newUnitTitle').value.trim(); if(!grade_id||!name)return; const order=Number((name.match(/\d+/)||['99'])[0]); const shouldNotify=panel.querySelector('#unitNotify')?.checked; const {data,error}=await state.client.from('units').insert({grade_id,name,title:title||null,sort_order:order,is_published:true}).select().single(); if(error)toast(error.message);else{await logAudit('unit_created','unit',data.id,{name,grade_id});await adminStructureRefresh('Unit added.');if(shouldNotify)notifyContent('unit',data.id);} });
@@ -2040,6 +2115,68 @@ ptpMailboxObserver.observe(els.content, {
   childList:true,
   subtree:true
 });
+
+
+// ---------------------------------------------------------------------------
+// v1.9.8p — Admin mailbox recipient reliability.
+// When Messages is opened directly from the Home tile, state.adminUsers may
+// still be empty. Load active members before the compose modal opens.
+// ---------------------------------------------------------------------------
+let ptpMailboxRecipientReloading = false;
+let ptpMailboxRecipientReplay = false;
+
+document.addEventListener('click', async event => {
+  const btn = event.target.closest?.('#mailboxAdminNewMessage');
+  if (!btn || !isStaff()) return;
+
+  if (ptpMailboxRecipientReplay) {
+    ptpMailboxRecipientReplay = false;
+    return;
+  }
+
+  const activeMembers = (state.adminUsers || []).filter(
+    u => u.role === 'user' && u.status === 'active'
+  );
+
+  if (activeMembers.length) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  if (ptpMailboxRecipientReloading) return;
+  ptpMailboxRecipientReloading = true;
+
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Loading members…';
+
+  try {
+    await loadAdminUsers();
+
+    const refreshed = (state.adminUsers || []).filter(
+      u => u.role === 'user' && u.status === 'active'
+    );
+
+    if (!refreshed.length) {
+      toast('No active Teacher/Learner members were found.');
+      return;
+    }
+
+    ptpMailboxRecipientReplay = true;
+    btn.disabled = false;
+    btn.textContent = originalText;
+    btn.click();
+  } catch (err) {
+    toast(err?.message || 'Could not load members.');
+  } finally {
+    ptpMailboxRecipientReloading = false;
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+}, true);
 
 
 boot();

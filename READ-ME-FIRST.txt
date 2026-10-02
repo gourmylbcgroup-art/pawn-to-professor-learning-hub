@@ -1,67 +1,35 @@
-Pawn to Professor v1.9.8o — 100-User Performance Preparation
+Pawn to Professor v1.9.8p — Recipients + Unit Phonics
 
-GOAL
-Reduce unnecessary background traffic and duplicate browser requests before
-testing the Learning Hub with larger classes / up to ~100 simultaneous users.
+This patch does exactly two things:
 
-IMPORTANT
-This is preparation, not a guarantee that 100 simultaneous users will never lag.
-Interactive lesson image/audio size, school Wi-Fi, Vercel usage and Supabase load
-still matter and should be load-tested.
+1. Admin Messages recipient fix
+- Admin -> Messages -> New Message now loads active members first if needed.
+- Fixes blank recipient/member dropdown when Messages is opened directly from the Home tile.
+- Active Teacher/Learner members appear in:
+  One member
+  Several selected members
+  All Teachers
+  All Learners
+  All Members
 
-CHANGES
+2. Unit Phonics setup
+- Admin -> Content Structure gets one button:
+  Create Unit Phonics in Grade 1 + Grade 2
+- Choose the correct school year first.
+- It creates only:
+  Grade 1 -> Unit Phonics
+  Grade 2 -> Unit Phonics
+- It does NOT create an activity.
+- It does NOT add a URL.
+- It does NOT merge Grade 1 and Grade 2.
+- Existing Unit Phonics entries are not duplicated.
 
-1. DEVICE SECURITY
-   Before v1.9.8n: every 60 seconds
-   v1.9.8o: every 10 minutes (600 seconds)
+Install:
+1. Replace root app.js
+2. Commit
+3. Wait for Vercel Ready
+4. Hard refresh
 
-   With 100 visible member sessions:
-   before: about 100 scheduled checks/minute
-   now:    about 10 scheduled checks/minute
-
-   The login/new-device security check is NOT removed.
-   A second-device login may take up to about 10 minutes to be detected by
-   the already-open first device.
-
-2. HIDDEN TABS
-   The periodic security check is skipped while the browser tab is hidden.
-   This prevents inactive/background tabs from creating unnecessary traffic.
-
-3. PORTAL SETTINGS REQUEST DE-DUPLICATION
-   portal_settings is cached in memory for 60 seconds.
-   The current app can request settings several times during boot/login;
-   those duplicate requests now reuse the same recent result.
-
-4. STRUCTURE REQUEST DE-DUPLICATION
-   If two parts of the page ask for Years / Grades / Units at the same time,
-   they share one in-flight request set instead of creating duplicate queries.
-   There is NO long-lived structure cache, so new Units/Grades are not hidden
-   by a stale multi-minute cache.
-
-PRESERVED
-- v1.9.8n mailbox performance improvements
-- 100-message member mailbox limit
-- member self-delete
-- Activity Delete
-- paid annual access
-- manual Paid Unit Release
-- Admin/Owner access
-- one-device security rule
-- no extra Vercel API route
-
-INSTALL
-Replace ONLY:
-  repository root / app.js
-
-Then:
-1. Commit
-2. Wait for Vercel -> Ready
-3. Hard refresh
-4. Test normal login
-5. Test My Messages
-6. Test Admin Activities/Delete
-7. Test on several devices before a larger class
-
-NO SQL.
-NO NEW /api FILE.
-NO NEW VERCEL SERVERLESS FUNCTION.
+No SQL.
+No new /api file.
+No new Vercel Serverless Function.
