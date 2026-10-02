@@ -1,35 +1,106 @@
-Pawn to Professor v1.9.8p — Recipients + Unit Phonics
+Pawn to Professor v1.9.8r — Combined Homepage Analytics
 
-This patch does exactly two things:
+THIS REPLACES v1.9.8q.
 
-1. Admin Messages recipient fix
-- Admin -> Messages -> New Message now loads active members first if needed.
-- Fixes blank recipient/member dropdown when Messages is opened directly from the Home tile.
-- Active Teacher/Learner members appear in:
-  One member
-  Several selected members
-  All Teachers
-  All Learners
-  All Members
+It combines BOTH things you asked for:
 
-2. Unit Phonics setup
-- Admin -> Content Structure gets one button:
-  Create Unit Phonics in Grade 1 + Grade 2
-- Choose the correct school year first.
-- It creates only:
-  Grade 1 -> Unit Phonics
-  Grade 2 -> Unit Phonics
-- It does NOT create an activity.
-- It does NOT add a URL.
-- It does NOT merge Grade 1 and Grade 2.
-- Existing Unit Phonics entries are not duplicated.
+A) PUBLIC / NOT-SIGNED-IN VISITS
+Counts visits to the public/login page even when the visitor has never registered.
 
-Install:
-1. Replace root app.js
-2. Commit
-3. Wait for Vercel Ready
-4. Hard refresh
+Shows:
+- Public visits today
+- Unique browsers today
+- Public visits last 7 days
+- Unique browsers last 7 days
+- Public visits last 30 days
+- Unique browsers last 30 days
 
-No SQL.
-No new /api file.
-No new Vercel Serverless Function.
+Privacy:
+- No IP address is stored by this patch.
+- Each browser receives a random UUID in localStorage.
+- “Unique browser” is an estimate, not a guaranteed unique person.
+- One person using two devices can count twice.
+- Clearing browser storage can create a new browser ID.
+
+B) LOGGED-IN MEMBER HOMEPAGE OPENS
+Uses your EXISTING analytics event:
+  portal_home_view
+
+Shows:
+- Member Home opens today / 7 days / 30 days
+- Unique members today / 7 days / 30 days
+- Newest 50 member Home-open records with member + date/time
+
+FILES
+1. homepage-activity-v1.9.8r.js
+2. SUPABASE-SQL-v1.9.8r.sql
+3. INDEX-SNIPPET.txt
+
+INSTALL — STEP BY STEP
+
+STEP 1 — SUPABASE
+Open Supabase -> SQL Editor.
+Copy ALL of SUPABASE-SQL-v1.9.8r.sql.
+Run it once.
+
+This creates:
+  public_home_visits
+  log_public_home_visit(...)
+
+It explicitly grants only the permissions required and uses RLS for Admin/Owner reading.
+
+STEP 2 — GITHUB
+Upload homepage-activity-v1.9.8r.js to the ROOT of the website repository.
+
+STEP 3 — INDEX.HTML
+Near the bottom of index.html you already have:
+  <script src="./analytics.js" defer></script>
+
+Immediately AFTER it add:
+  <script src="./homepage-activity-v1.9.8r.js" defer></script>
+
+IMPORTANT:
+If you already installed:
+  homepage-activity-v1.9.8q.js
+REMOVE that old script line.
+Use only v1.9.8r.
+
+STEP 4 — COMMIT
+Commit the files.
+
+STEP 5 — VERCEL
+Wait until the new Vercel deployment says Ready.
+
+STEP 6 — HARD REFRESH
+Open the website and hard refresh.
+
+STEP 7 — TEST PUBLIC VISIT
+Open a private/incognito browser window.
+Do NOT log in.
+Open the website login page.
+Close/reopen or refresh once if you want a second page-open test.
+
+STEP 8 — CHECK ADMIN
+Log in as Admin/Owner.
+Open:
+  Admin -> Usage Analytics
+
+At the top you will see:
+  Homepage Activity
+
+with TWO separate groups:
+  Public visitors — not signed in
+  Logged-in member Home opens
+
+IMPORTANT MEANING
+“Public visitor” means the page was opened while no account was signed in.
+The system cannot know whether that anonymous person has registered before.
+It deliberately does not identify them personally.
+
+VERCEL
+No new Vercel Serverless Function is added.
+Anonymous logging goes directly through a tightly-scoped Supabase RPC.
+
+DATABASE LOAD
+One tiny database insert per public/login-page open.
+This is lightweight for your 100-user target.

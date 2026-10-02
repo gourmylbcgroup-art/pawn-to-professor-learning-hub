@@ -1,0 +1,3 @@
+<!-- Replace the old v1.9.8q Homepage Activity script, if you installed it. -->
+<!-- Put this AFTER analytics.js near the bottom of index.html: -->
+<script src="./homepage-activity-v1.9.8r.js" defer></script>
