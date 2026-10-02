@@ -1,106 +1,106 @@
-Pawn to Professor v1.9.8r — Combined Homepage Analytics
+Pawn to Professor v1.9.8s — Member Analytics + Log Retention
 
-THIS REPLACES v1.9.8q.
+THIS REPLACES:
+- homepage-activity-v1.9.8q.js
+- homepage-activity-v1.9.8r.js
 
-It combines BOTH things you asked for:
+WHAT IT DOES
 
-A) PUBLIC / NOT-SIGNED-IN VISITS
-Counts visits to the public/login page even when the visitor has never registered.
+1) MEMBER DETAILED ACTIVITY LOGS
+- Existing usage_events remains the live detailed log.
+- Detailed MEMBER rows older than 100 days are automatically copied into:
+    member_usage_archive
+- ONLY after the archive copy exists are those old rows removed from the live usage_events table.
+- Automatic maintenance runs at most once per 24 hours, triggered by normal member usage/login.
+- Admin can manually run the 100-day archive at any time.
+- Admin can Download TXT whenever wanted.
+- Admin can permanently delete live + archived detailed member logs whenever wanted.
+- Deleting detailed logs does NOT delete Member Personal Analytics.
 
-Shows:
-- Public visits today
-- Unique browsers today
-- Public visits last 7 days
-- Unique browsers last 7 days
-- Public visits last 30 days
-- Unique browsers last 30 days
+2) MEMBER LOGIN TRACKING
+- Records successful login-form logins only.
+- A normal page refresh does NOT count as another login.
+- Shows First Login, Last Login and Total Logins in the permanent summary.
+- Login-event history can be downloaded as TXT.
+- Login-event history can be deleted manually.
+- Deleting login-event history does NOT delete the permanent summary.
 
-Privacy:
-- No IP address is stored by this patch.
-- Each browser receives a random UUID in localStorage.
-- “Unique browser” is an estimate, not a guaranteed unique person.
-- One person using two devices can count twice.
-- Clearing browser storage can create a new browser ID.
+IMPORTANT:
+Historical logins from BEFORE this patch cannot be reconstructed reliably.
+Login counts start when v1.9.8s is installed.
 
-B) LOGGED-IN MEMBER HOMEPAGE OPENS
-Uses your EXISTING analytics event:
-  portal_home_view
+3) MEMBER PERSONAL ANALYTICS
+Permanent cumulative per-member summary:
+- First login
+- Last login
+- Total logins
+- Homepage opens
+- Unit opens
+- Game plays
+- Resource views
+- Downloads
+- and other usage counters
 
-Shows:
-- Member Home opens today / 7 days / 30 days
-- Unique members today / 7 days / 30 days
-- Newest 50 member Home-open records with member + date/time
+This summary has NO automatic expiry.
+It can be manually deleted per member.
+After deletion, future activity/login can create a new summary again.
 
-FILES
-1. homepage-activity-v1.9.8r.js
-2. SUPABASE-SQL-v1.9.8r.sql
-3. INDEX-SNIPPET.txt
+4) PUBLIC VISITOR ANALYTICS
+- Counts page opens while nobody is signed in.
+- No IP address stored.
+- No automatic deletion.
+- Download TXT whenever wanted.
+- Delete Visitor Log manually whenever wanted.
 
-INSTALL — STEP BY STEP
+SETUP
 
 STEP 1 — SUPABASE
 Open Supabase -> SQL Editor.
-Copy ALL of SUPABASE-SQL-v1.9.8r.sql.
-Run it once.
-
-This creates:
-  public_home_visits
-  log_public_home_visit(...)
-
-It explicitly grants only the permissions required and uses RLS for Admin/Owner reading.
+Copy ALL of SUPABASE-SQL-v1.9.8s.sql and Run it once.
 
 STEP 2 — GITHUB
-Upload homepage-activity-v1.9.8r.js to the ROOT of the website repository.
+Upload this file to the repository ROOT:
+  analytics-retention-v1.9.8s.js
 
 STEP 3 — INDEX.HTML
-Near the bottom of index.html you already have:
-  <script src="./analytics.js" defer></script>
+Use the included ready file:
+  index-v1.9.8s.html
 
-Immediately AFTER it add:
-  <script src="./homepage-activity-v1.9.8r.js" defer></script>
+Rename it to:
+  index.html
 
-IMPORTANT:
-If you already installed:
+and replace your current root index.html.
+
+OR edit index.html manually and place this immediately AFTER analytics.js:
+  <script src="./analytics-retention-v1.9.8s.js" defer></script>
+
+REMOVE any old lines for:
   homepage-activity-v1.9.8q.js
-REMOVE that old script line.
-Use only v1.9.8r.
+  homepage-activity-v1.9.8r.js
 
 STEP 4 — COMMIT
-Commit the files.
+Commit changes.
 
 STEP 5 — VERCEL
-Wait until the new Vercel deployment says Ready.
+Wait until Vercel says Ready.
 
 STEP 6 — HARD REFRESH
-Open the website and hard refresh.
+Mac:
+  Command + Shift + R
 
-STEP 7 — TEST PUBLIC VISIT
-Open a private/incognito browser window.
-Do NOT log in.
-Open the website login page.
-Close/reopen or refresh once if you want a second page-open test.
-
-STEP 8 — CHECK ADMIN
-Log in as Admin/Owner.
-Open:
+STEP 7 — TEST LOGIN TRACKING
+Log OUT.
+Log in normally with a normal member account.
+Then as Admin/Owner open:
   Admin -> Usage Analytics
 
-At the top you will see:
-  Homepage Activity
+You should see:
+- Homepage Activity
+- Member Personal Analytics
+- Logs — Export, Archive & Delete
 
-with TWO separate groups:
-  Public visitors — not signed in
-  Logged-in member Home opens
-
-IMPORTANT MEANING
-“Public visitor” means the page was opened while no account was signed in.
-The system cannot know whether that anonymous person has registered before.
-It deliberately does not identify them personally.
-
-VERCEL
-No new Vercel Serverless Function is added.
-Anonymous logging goes directly through a tightly-scoped Supabase RPC.
-
-DATABASE LOAD
-One tiny database insert per public/login-page open.
-This is lightweight for your 100-user target.
+IMPORTANT DATABASE / VERCEL NOTES
+- No new Vercel Serverless Function.
+- New Supabase tables use explicit least-privilege GRANTs.
+- RLS is enabled.
+- Delete operations happen only through Admin-checked RPC functions.
