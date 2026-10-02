@@ -1,0 +1,93 @@
+/* Pawn to Professor v1.9.8t — Content Protection */
+#ptp-protection-watermark {
+  position:fixed;
+  inset:0;
+  z-index:2147483000;
+  pointer-events:none;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(220px,1fr));
+  grid-auto-rows:150px;
+  align-content:center;
+  justify-content:center;
+  gap:10px 24px;
+  padding:20px;
+  opacity:.115;
+  color:#163c32;
+  font-family:Inter,"Segoe UI",system-ui,sans-serif;
+  font-size:clamp(12px,1.4vw,18px);
+  font-weight:800;
+  letter-spacing:.025em;
+  text-align:center;
+  user-select:none;
+}
+
+#ptp-protection-watermark span {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transform:rotate(-24deg);
+  white-space:nowrap;
+}
+
+#ptp-protection-notice {
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  z-index:2147483646;
+  transform:translate(-50%,20px);
+  opacity:0;
+  pointer-events:none;
+  padding:10px 16px;
+  border-radius:999px;
+  background:rgba(8,47,37,.94);
+  color:#fff;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  font:700 13px/1.25 Inter,"Segoe UI",system-ui,sans-serif;
+  transition:opacity .18s ease,transform .18s ease;
+}
+
+#ptp-protection-notice.show {
+  opacity:1;
+  transform:translate(-50%,0);
+}
+
+.ptp-protected-content,
+.ptp-protected-content *:not(input):not(textarea):not(select):not([contenteditable="true"]):not([contenteditable=""]) {
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+.ptp-protected-content img {
+  -webkit-user-drag:none;
+  user-drag:none;
+}
+
+@media (max-width:760px) {
+  #ptp-protection-watermark {
+    grid-template-columns:repeat(2,minmax(150px,1fr));
+    grid-auto-rows:120px;
+    font-size:11px;
+    opacity:.10;
+  }
+}
+
+@media print {
+  html.ptp-protection-enabled body > * {
+    visibility:hidden !important;
+  }
+
+  html.ptp-protection-enabled body::before {
+    content:"Pawn to Professor — Protected content. Printing is disabled.";
+    visibility:visible !important;
+    position:fixed;
+    inset:0;
+    display:grid;
+    place-items:center;
+    padding:40px;
+    font:800 24px/1.4 Inter,"Segoe UI",system-ui,sans-serif;
+    text-align:center;
+    color:#163c32;
+    background:#fff;
+  }
+}
