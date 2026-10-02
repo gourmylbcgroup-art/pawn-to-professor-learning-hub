@@ -1,0 +1,50 @@
+/* Pawn to Professor v1.9.8u — subtle secure-player watermark */
+
+#ptp-subtle-watermark-site,
+#ptp-subtle-watermark-user {
+  position:absolute;
+  z-index:12;
+  pointer-events:none;
+  user-select:none;
+  font-family:Inter,"Segoe UI",system-ui,sans-serif;
+  font-weight:800;
+  letter-spacing:.02em;
+  color:rgba(20,60,48,.14);
+  text-shadow:0 1px 2px rgba(255,255,255,.35);
+}
+
+#ptp-subtle-watermark-site {
+  top:12px;
+  right:16px;
+  font-size:clamp(12px,1.3vw,17px);
+}
+
+#ptp-subtle-watermark-user {
+  left:16px;
+  bottom:14px;
+  font-size:clamp(11px,1.15vw,15px);
+}
+
+#gameStage {
+  position:absolute;
+}
+
+#gameStage img,
+#gameStage iframe {
+  -webkit-user-drag:none;
+  user-drag:none;
+}
+
+@media (max-width:760px) {
+  #ptp-subtle-watermark-site {
+    top:8px;
+    right:10px;
+    font-size:11px;
+  }
+
+  #ptp-subtle-watermark-user {
+    left:10px;
+    bottom:10px;
+    font-size:10px;
+  }
+}

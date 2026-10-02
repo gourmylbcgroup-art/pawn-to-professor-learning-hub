@@ -1,106 +1,47 @@
-Pawn to Professor v1.9.8s — Member Analytics + Log Retention
+Pawn to Professor v1.9.8u — Subtle Game-Only Watermark
 
-THIS REPLACES:
-- homepage-activity-v1.9.8q.js
-- homepage-activity-v1.9.8r.js
+This replaces the ugly full-page repeated watermark idea.
 
 WHAT IT DOES
+- NO watermark on homepage.
+- NO watermark on menus.
+- NO watermark on Admin portal.
+- NO repeated watermark across the whole screen.
+- Only the secure game/player area is protected.
 
-1) MEMBER DETAILED ACTIVITY LOGS
-- Existing usage_events remains the live detailed log.
-- Detailed MEMBER rows older than 100 days are automatically copied into:
-    member_usage_archive
-- ONLY after the archive copy exists are those old rows removed from the live usage_events table.
-- Automatic maintenance runs at most once per 24 hours, triggered by normal member usage/login.
-- Admin can manually run the 100-day archive at any time.
-- Admin can Download TXT whenever wanted.
-- Admin can permanently delete live + archived detailed member logs whenever wanted.
-- Deleting detailed logs does NOT delete Member Personal Analytics.
+Inside the secure game player:
+Top-right:
+  pawntoprofessor.com
 
-2) MEMBER LOGIN TRACKING
-- Records successful login-form logins only.
-- A normal page refresh does NOT count as another login.
-- Shows First Login, Last Login and Total Logins in the permanent summary.
-- Login-event history can be downloaded as TXT.
-- Login-event history can be deleted manually.
-- Deleting login-event history does NOT delete the permanent summary.
+Bottom-left:
+  Licensed to: <username>
 
-IMPORTANT:
-Historical logins from BEFORE this patch cannot be reconstructed reliably.
-Login counts start when v1.9.8s is installed.
+The watermark is small and faint.
 
-3) MEMBER PERSONAL ANALYTICS
-Permanent cumulative per-member summary:
-- First login
-- Last login
-- Total logins
-- Homepage opens
-- Unit opens
-- Game plays
-- Resource views
-- Downloads
-- and other usage counters
+Protection is limited to the secure player:
+- right-click blocked in the game area
+- image/iframe dragging blocked
+- Cmd/Ctrl+S blocked
+- Cmd/Ctrl+P blocked
 
-This summary has NO automatic expiry.
-It can be manually deleted per member.
-After deletion, future activity/login can create a new summary again.
+IMPORTANT
+This still cannot guarantee screenshot prevention.
+It is a deterrent and makes screenshots traceable to the member account.
 
-4) PUBLIC VISITOR ANALYTICS
-- Counts page opens while nobody is signed in.
-- No IP address stored.
-- No automatic deletion.
-- Download TXT whenever wanted.
-- Delete Visitor Log manually whenever wanted.
+INSTALL
+1. Upload these 3 files to the website root:
+   play.html
+   game-watermark-v1.9.8u.js
+   game-watermark-v1.9.8u.css
 
-SETUP
+2. Replace the current play.html with this one.
 
-STEP 1 — SUPABASE
-Open Supabase -> SQL Editor.
-Copy ALL of SUPABASE-SQL-v1.9.8s.sql and Run it once.
+3. Do NOT add anything to index.html.
 
-STEP 2 — GITHUB
-Upload this file to the repository ROOT:
-  analytics-retention-v1.9.8s.js
+4. Commit.
+5. Wait for Vercel Ready.
+6. Hard refresh.
+7. Login with a normal member and open a secure activity.
 
-STEP 3 — INDEX.HTML
-Use the included ready file:
-  index-v1.9.8s.html
-
-Rename it to:
-  index.html
-
-and replace your current root index.html.
-
-OR edit index.html manually and place this immediately AFTER analytics.js:
-  <script src="./analytics-retention-v1.9.8s.js" defer></script>
-
-REMOVE any old lines for:
-  homepage-activity-v1.9.8q.js
-  homepage-activity-v1.9.8r.js
-
-STEP 4 — COMMIT
-Commit changes.
-
-STEP 5 — VERCEL
-Wait until Vercel says Ready.
-
-STEP 6 — HARD REFRESH
-Mac:
-  Command + Shift + R
-
-STEP 7 — TEST LOGIN TRACKING
-Log OUT.
-Log in normally with a normal member account.
-Then as Admin/Owner open:
-  Admin -> Usage Analytics
-
-You should see:
-- Homepage Activity
-- Member Personal Analytics
-- Logs — Export, Archive & Delete
-
-IMPORTANT DATABASE / VERCEL NOTES
-- No new Vercel Serverless Function.
-- New Supabase tables use explicit least-privilege GRANTs.
-- RLS is enabled.
-- Delete operations happen only through Admin-checked RPC functions.
+NO SQL.
+NO NEW VERCEL FUNCTION.
