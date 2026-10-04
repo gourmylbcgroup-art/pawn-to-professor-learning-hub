@@ -1,0 +1,9 @@
+/* Pawn to Professor v1.9.8x — front-page release announcements */
+.release-news-panel{margin:0 0 1rem;padding:.9rem;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.07)}
+.release-news-head{display:flex;justify-content:space-between;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.65rem}
+.release-news-head strong{font-size:1.1rem}.release-news-head span{font-size:.82rem;opacity:.78}
+.release-news-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.release-news-card{padding:.75rem;border-radius:12px;background:rgba(0,0,0,.10);border:1px solid rgba(255,255,255,.10)}
+.release-news-card strong{display:block;margin-bottom:.25rem}.release-news-card p{margin:.25rem 0 .45rem;line-height:1.4}.release-news-card small{opacity:.7}
+.release-news-note{margin:.65rem 0 0;font-size:.78rem;opacity:.78}
+@media(max-width:850px){.release-news-list{grid-template-columns:1fr}}

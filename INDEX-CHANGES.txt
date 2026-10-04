@@ -1,0 +1,12 @@
+ADD THESE CSS LINES IN <head>:
+
+<link rel="stylesheet" href="./curriculum-communications-v1.9.8x.css" />
+<link rel="stylesheet" href="./release-announcements-v1.9.8x.css" />
+
+ADD THESE SCRIPTS AT THE BOTTOM, AFTER paid-unit-release-v1.9.8k.js:
+
+<script src="./curriculum-communications-v1.9.8x.js" defer></script>
+<script src="./release-announcements-v1.9.8x.js" defer></script>
+
+Your current index.html already loads XLSX.
+Do NOT add another XLSX library.
