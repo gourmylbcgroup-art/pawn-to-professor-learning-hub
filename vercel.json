@@ -30,7 +30,7 @@
       "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/admin/curriculum-reminders",
+      "path": "/api/security?action=curriculum-reminders",
       "schedule": "15 0 * * *"
     }
   ],

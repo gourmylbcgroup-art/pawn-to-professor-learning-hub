@@ -1,174 +1,39 @@
-PAWN TO PROFESSOR v1.9.8x — CURRICULUM MANAGER PATCH
+PAWN TO PROFESSOR v1.9.8y — HOBBY-SAFE
 
-PURPOSE
-Admin/Owner-only curriculum control centre for Grades 3–6.
+WHY THIS VERSION EXISTS
+Your last successful Vercel deployment already uses 12 Functions. The previous v1.9.8x patch added 3 new /api/admin endpoints, which would make 15. This Hobby-safe patch adds ZERO new Vercel Functions.
 
-FEATURES
-1. Curriculum Calendar
-   - Week 1 = Monday 7 September 2026.
-   - Automatically shows the current teaching week.
-   - Shows each Grade 3–6 Unit, curriculum weeks, start date, and recommended unlock date.
-   - Recommended unlock date = 2 weeks before the Unit starts.
+HOW IT WORKS
+The three features now travel through the existing /api/security.js Vercel Function:
+- /api/security?action=curriculum-reminders
+- /api/security?action=unit-release-announcement
+- /api/security?action=mass-message
 
-2. Email reminders to Admin/Owner
-   - Sunday: next curriculum week starts tomorrow.
-   - Monday: current curriculum week starts today.
-   - Unit release due date: reminder to unlock.
-   - If still locked: one overdue reminder per day until the Paid Unit release is done.
-   - Daily Vercel Cron runs at 00:15 UTC = 08:15 Taiwan time.
+Their implementation files live under /api/_lib/. Helper modules under _lib are bundled into security.js and are not separate Vercel Functions.
 
-3. Production Tracker
-   Per Grade/Unit:
-   - Curriculum checked
-   - Lesson completed
-   - Slides completed
-   - Flashcards completed
-   - Worksheet completed
-   - Game completed
-   - Interactive lesson completed
-   - Teacher guide completed
-   - Uploaded online
-   - Tested online
-   - Ready for teachers
-   - Notes
-   - Automatic completion percentage
+IMPORTANT FILES TO REPLACE / ADD
+REPLACE:
+- /api/security.js
+- /api/_lib/mailbox-actions.js
+- /vercel.json
 
-4. Unit Release
-   - Uses the existing Paid Unit Release RPC.
-   - Unit 1 stays the default opening Unit.
-   - Clicking Unlock uses release_paid_unit_name.
-   - IMPORTANT: your current Paid Release system releases the same Unit number across all published grades.
-     Therefore the Curriculum & Communications uses the EARLIEST curriculum need among Grades 3–6 to calculate each
-     global Unit release deadline.
+ADD:
+- /api/_lib/curriculum-reminders.js
+- /api/_lib/unit-release-announcement.js
+- /api/_lib/mass-message.js
+- /curriculum-communications-v1.9.8y.js
+- /curriculum-communications-v1.9.8y.css
+- /release-announcements-v1.9.8y.js
+- /release-announcements-v1.9.8y.css
 
-5. Excel Export
-   Button: Export Excel
-   Creates:
-   - Curriculum Calendar
-   - Production Tracker
-   - Unit Release Schedule
-   - Reminder History
-   The workbook uses landscape / fit-to-width page settings and practical column widths.
+DO NOT UPLOAD THESE AS /api/admin FUNCTIONS:
+- curriculum-reminders.js
+- unit-release-announcement.js
+- mass-message.js
 
-SECURITY
-- Normal members do not see the Curriculum & Communications.
-- All Curriculum & Communications tables use RLS.
-- Only active Admin/Owner accounts can read/write tracker data.
-- No anon table access is granted.
-- The email Cron endpoint requires CRON_SECRET for GET requests.
-- Manual reminder check requires an authenticated Admin/Owner login.
+SQL
+If you already successfully ran the v1.9.8x SQL, DO NOT run SQL again. The database schema is the same.
+If you did not run it yet, run sql/CURRICULUM_COMMUNICATIONS_v1.9.8y.sql once.
 
-INSTALL ORDER
-1. Supabase → SQL Editor
-   Run:
-   sql/CURRICULUM_MANAGER_v1.9.8x.sql
-
-2. GitHub root
-   Upload:
-   curriculum-manager-v1.9.8x.js
-   curriculum-manager-v1.9.8x.css
-
-3. GitHub
-   Upload:
-   api/admin/curriculum-reminders.js
-   into exactly:
-   /api/admin/curriculum-reminders.js
-
-4. Replace vercel.json with the included vercel.json.
-
-5. Edit index.html using INDEX-CHANGES.txt.
-
-6. Commit and wait for Vercel → Ready.
-
-7. Environment variables
-   Existing email system already uses:
-   - RESEND_API_KEY
-   - EMAIL_FROM
-   - SUPABASE_URL
-   - SUPABASE_SERVICE_ROLE_KEY
-   - CRON_SECRET
-   - PORTAL_BASE_URL (optional)
-   If renewal reminders already work, CRON_SECRET is already configured.
-
-8. Test
-   - Login as Admin.
-   - Open Admin.
-   - Click Curriculum & Communications.
-   - Confirm current Week.
-   - Check one tracker box and refresh.
-   - Run reminder check manually.
-   - Export Excel.
-   - Login as a normal member: Curriculum & Communications must NOT appear.
-
-CURRICULUM SEEDED
-Grade 3:
-U1 W1–2 Greeting
-U2 W3–5 How old am I?
-U3 W6–8 My Family, My Pet and Me
-U4 W9–11 Beautiful Color, My Feelings
-U5 W12–14 Festivals and Holidays
-U6 W15–16 I am a Star
-
-Grade 4:
-U1 W1–2 My Community
-U2 W3–4 My Community Life
-U3 W5–7 Observing the Community
-U4 W8–10 Community Service
-U5 W11–13 Exploring the Community
-
-Grade 5:
-U1 W1–3 Welcome to Yunlin
-U2 W4–5 Three Meals in Yunlin
-U3 W6–7 Living in Yunlin
-U4 W8–10 Travel Plan
-U5 W11–13 Marketing Yunlin / Yunlin Festivals
-
-Grade 6:
-U1 W1–3 Know the World
-U2 W4–6 Tour Guide
-U3 W7–9 We are not the same: Food
-U4 W10–12 We are not the same: Clothing
-U5 W13–15 World Attractions
-
-
-NEW RELEASE ANNOUNCEMENT BEHAVIOR
-- When Admin releases Unit 2, Unit 3, Unit 4, etc., ALL active accounts with a valid email receive the announcement.
-- This includes trial members and members who do not currently have that Unit unlocked.
-- Receiving the email does NOT grant access.
-- The front page shows the 3 latest Unit release announcements to all active logged-in accounts.
-- Duplicate release clicks do not send duplicate announcement emails for the same Unit.
-
-
-NEW IN v1.9.8x — MASS MESSAGING IN THE SAME ADMIN PAGE
-
-Admin → Curriculum & Communications now contains:
-- Overview
-- Calendar
-- Production Tracker
-- Unit Releases
-- Mass Messages
-- Release Announcements
-- Reminder History
-- Excel Export
-
-MASS MESSAGE AUDIENCES
-- All active members
-- All teachers
-- All learners
-- Active trial members
-- Active paid members
-- Selected members
-- Members with effective access to a selected Grade / Unit
-
-MASS MESSAGE DELIVERY
-- Creates a separate private mailbox copy for each recipient.
-- Members never see each other's names.
-- Optional email notification.
-- Preview recipient count before sending.
-- Confirmation before sending.
-- Stores send history with recipient count, mailbox count, email sent/failed/skipped and status.
-
-SECURITY
-- Mass messaging API requires active Admin/Owner authentication.
-- Normal members cannot access mass-message history.
-- Grade/Unit audience uses the existing effective_unit_ids_for_user RPC so dynamic access is respected.
+EXPECTED VERCEL RESULT
+The deployment should stay at the same Function count as the existing site (approximately 12), instead of increasing to 15.

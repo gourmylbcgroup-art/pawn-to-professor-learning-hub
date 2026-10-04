@@ -1,0 +1,34 @@
+/* Pawn to Professor v1.9.8y — Curriculum Manager */
+.cm-head{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap}
+.cm-tabs{display:flex;gap:.45rem;flex-wrap:wrap;margin:.8rem 0 1rem}
+.cm-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin-bottom:1rem}
+.cm-kpi,.cm-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:1rem}
+.cm-kpi strong{display:block;font-size:1.35rem}.cm-kpi span{display:block;margin-top:.2rem;opacity:.85}
+.cm-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin-bottom:.8rem}
+.cm-line{display:flex;justify-content:space-between;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.12)}
+.cm-line:last-child{border-bottom:0}
+.cm-mini-list>div{display:flex;justify-content:space-between;gap:1rem;padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.cm-table-wrap{overflow:auto;width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.14)}
+.cm-table{width:100%;border-collapse:collapse;min-width:850px;background:rgba(0,0,0,.08)}
+.cm-table th,.cm-table td{padding:.62rem .55rem;border-bottom:1px solid rgba(255,255,255,.12);vertical-align:top;text-align:left}
+.cm-table th{position:sticky;top:0;z-index:2;background:#124e3d;color:#fff;white-space:nowrap}
+.cm-table tbody tr:hover{background:rgba(255,255,255,.05)}
+.cm-status{display:inline-flex;align-items:center;gap:.25rem;padding:.23rem .45rem;border-radius:999px;font-size:.78rem;font-weight:800;white-space:nowrap}
+.cm-status.unlocked{background:rgba(34,197,94,.16)}
+.cm-status.unlock-due{background:rgba(245,158,11,.18)}
+.cm-status.overdue{background:rgba(239,68,68,.18)}
+.cm-status.prepare{background:rgba(234,179,8,.14)}
+.cm-status.future{background:rgba(148,163,184,.14)}
+.cm-checkcell{text-align:center!important}.cm-checkcell input{width:20px;height:20px;cursor:pointer}
+.cm-progress{height:9px;min-width:95px;background:rgba(255,255,255,.13);border-radius:999px;overflow:hidden;margin:.1rem 0 .25rem}
+.cm-progress span{display:block;height:100%;background:currentColor;border-radius:999px}
+.cm-tracker-table textarea{min-width:180px;width:100%;resize:vertical}
+.cm-tracker-table .btn{margin-top:.3rem}
+.cm-ok{font-weight:800}
+@media(max-width:900px){
+  .cm-kpis,.cm-grid2{grid-template-columns:1fr}
+}
+
+.cm-recipient-preview{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:.75rem 0;padding:.7rem .8rem;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)}
+.cm-recipient-preview strong{font-size:1.05rem}
+.cm-recipient-preview span{opacity:.8;font-size:.85rem}

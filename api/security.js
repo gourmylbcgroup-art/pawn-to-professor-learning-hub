@@ -4,6 +4,9 @@ import { enforceRateLimit } from './_lib/rate-limit.js';
 import { emailConfigured, sendEmail } from './_lib/email.js';
 import { handleSupportMessage, handleApproveRegistration } from './_lib/mailbox-actions.js';
 import { handleRecordAnnualPayment, handlePaymentAdjustment, handleRenewalReminders } from './_lib/payment-actions.js';
+import handleCurriculumReminders from './_lib/curriculum-reminders.js';
+import handleUnitReleaseAnnouncement from './_lib/unit-release-announcement.js';
+import handleMassMessage from './_lib/mass-message.js';
 import {
   json,
   getAuthenticatedProfile,
@@ -425,8 +428,9 @@ async function resetPassword({ req, res, admin }) {
 export default async function handler(req, res) {
   const action = actionFromRequest(req);
 
-  if (action === 'renewal-reminders') {
-    if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+  if (action === 'renewal-reminders' || action === 'curriculum-reminders') {
+    if (!['GET','POST'].includes(req.method)) return json(res, 405, { error: 'Method not allowed' });
+    if (action === 'renewal-reminders' && req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
   } else if (req.method !== 'POST') {
     return json(res, 405, { error: 'Method not allowed' });
   }
@@ -460,6 +464,12 @@ export default async function handler(req, res) {
       return handlePaymentAdjustment({ req, res, admin });
     case 'renewal-reminders':
       return handleRenewalReminders({ req, res, admin });
+    case 'curriculum-reminders':
+      return handleCurriculumReminders(req, res);
+    case 'unit-release-announcement':
+      return handleUnitReleaseAnnouncement(req, res);
+    case 'mass-message':
+      return handleMassMessage(req, res);
     default:
       return json(res, 404, { error: 'Unknown security action.' });
   }
