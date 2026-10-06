@@ -1,47 +1,54 @@
-IMPORTANT — THIS VERSION DOES NOT ADD A NEW VERCEL FUNCTION
+Pawn to Professor v1.9.8t — PUBLIC VISITOR TRACKING FIX
 
-Do this exactly:
+WHAT IT FIXES
+The public visitor counter stayed at 0 because the old patch waited for:
+  globalThis.state?.client
 
-1. DELETE this file if it exists:
-   api/unit-guide.js
+Your main app defines:
+  const state = { ... }
 
-2. REPLACE your existing:
-   api/security.js
-   with the api/security.js included in this patch.
+That does not reliably expose state as globalThis.state.
 
-3. ADD this helper:
-   api/_lib/unit-guide.js
+This patch directly checks the existing state variable and falls back to globalThis.state only if available.
 
-   This helper is imported by api/security.js and does not create a separate public API route.
+INSTALLATION
+1. Upload:
+   public-visitor-fix-v1.9.8t.js
 
-4. REPLACE:
-   unit-pdf-guides-v1.9.8z.js
-   with:
-   unit-pdf-guides-v1.9.8z3.js
+2. In index.html, add this line AFTER:
+   <script src="./analytics-retention-v1.9.8s.js" defer></script>
 
-5. You can keep the CSS reference in index.html, but change the JS filename:
-   <script src="./unit-pdf-guides-v1.9.8z3.js" defer></script>
+   Add:
+   <script src="./public-visitor-fix-v1.9.8t.js" defer></script>
 
-6. Upload:
-   unit-pdf-guides-v1.9.8z3.css
-   and change the CSS filename in index.html too if you use this file.
+3. Redeploy Vercel.
 
-7. Your SQL is ALREADY DONE. Do not run SQL again.
+4. Test in a PRIVATE / INCOGNITO browser window while NOT logged in.
+   Open the main login page and wait about 2 seconds.
 
-8. Vercel variables must remain:
-   DOCS_SUPABASE_URL
-   DOCS_SUPABASE_SERVICE_ROLE_KEY
+5. Log in as Admin and go to Usage Analytics → Homepage Activity → Refresh.
+   Public visits should increase.
 
-The PDF API is now:
-   /api/security?action=unit-guide
+IMPORTANT
+- One page load = one anonymous visit.
+- A random browser ID is used for unique-browser estimates.
+- No IP address is stored by this patch.
+- Logged-in members are NOT counted as public visitors.
+- If Supabase RPC fails, the browser console now shows the real error instead of hiding it.
 
-instead of:
-   /api/unit-guide
+MANUAL DIAGNOSTIC
+Open browser console on the login page and run:
+  PTP_PUBLIC_VISITOR_FIX.status()
 
-This means the PDF system reuses your existing security Vercel Function.
+Expected:
+  clientReady: true
+  loginVisible: true
+  hasSession: false
 
+To retry manually:
+  PTP_PUBLIC_VISITOR_FIX.retry()
 
-v1.9.8z3 MENU VISIBILITY FIX
-- The Unit Guides button is now inserted directly after Admin → Resources.
-- This avoids the button being placed at the very bottom of a long Admin sidebar.
-- If Resources cannot be found, Unit Guides is placed at the top.
+If the console then says:
+  log_public_home_visit failed
+
+the problem is in the Supabase RPC/policy rather than the browser script.
