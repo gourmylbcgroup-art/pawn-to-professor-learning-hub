@@ -1,14 +1,15 @@
-HOBBY-SAFE v1.9.8y
+EDIT index.html.
 
-ADD THESE CSS LINES IN <head>:
+1. In <head>, after your other CSS files, add:
 
-<link rel="stylesheet" href="./curriculum-communications-v1.9.8y.css" />
-<link rel="stylesheet" href="./release-announcements-v1.9.8y.css" />
+<link rel="stylesheet" href="./unit-pdf-guides-v1.9.8z.css" />
 
-ADD THESE SCRIPTS AT THE BOTTOM, AFTER paid-unit-release-v1.9.8k.js:
+2. At the VERY BOTTOM of the scripts, after all your other portal patch scripts, add:
 
-<script src="./curriculum-communications-v1.9.8y.js" defer></script>
-<script src="./release-announcements-v1.9.8y.js" defer></script>
+<script src="./unit-pdf-guides-v1.9.8z.js" defer></script>
 
-REMOVE any old v1.9.8x curriculum/release lines if they were added.
-Your current index already loads XLSX; do not add it again.
+For your current index.html, place it after:
+
+<script src="./hide-paid-trial-banner-v1.9.8l.js" defer></script>
+
+No vercel.json change is required because /api/unit-guide.js is a normal Vercel Function route.

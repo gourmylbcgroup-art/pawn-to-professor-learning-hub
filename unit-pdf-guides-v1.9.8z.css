@@ -1,0 +1,19 @@
+/* Pawn to Professor v1.9.8z — Secure Unit PDF Guides */
+body.ptp-guide-open{overflow:hidden}
+.ptp-unit-guide-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;margin:0 0 1rem;padding:1rem 1.05rem;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.09)}
+.ptp-unit-guide-card-icon{font-size:2.2rem}.ptp-unit-guide-card-copy h2{margin:0 0 .2rem}.ptp-unit-guide-card-copy p{margin:.15rem 0}.ptp-unit-guide-card-copy small{opacity:.78}
+.ptp-unit-guide-overlay{position:fixed;inset:0;z-index:100000;background:rgba(5,24,20,.94);display:grid;place-items:center;padding:18px}
+.ptp-unit-guide-shell{width:min(1200px,98vw);height:min(94vh,1050px);display:grid;grid-template-rows:auto auto 1fr auto;overflow:hidden;border-radius:18px;background:#163f34;color:#f7f3df;border:1px solid rgba(255,255,255,.24);box-shadow:0 24px 90px rgba(0,0,0,.5)}
+.ptp-unit-guide-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:14px 18px;background:#0f5a42}.ptp-unit-guide-head h2{margin:.1rem 0;font-size:1.45rem}.ptp-unit-guide-head p{margin:0;opacity:.78}
+.ptp-unit-guide-kicker{font-size:.72rem;font-weight:900;letter-spacing:.15em;color:#ffd04a}
+.ptp-unit-guide-security{padding:8px 18px;font-size:.82rem;background:rgba(255,208,74,.1);border-bottom:1px solid rgba(255,255,255,.12)}
+.ptp-unit-guide-pages{overflow:auto;padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px;overscroll-behavior:contain;user-select:none;-webkit-user-select:none}
+.ptp-unit-guide-loading,.ptp-unit-guide-error{min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7rem;text-align:center}
+.ptp-pdf-page-slot{position:relative;min-height:440px;width:min(100%,1100px);display:grid;place-items:center;background:#e8e8e8;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.28);overflow:hidden}
+.ptp-pdf-placeholder{color:#51615c;font-weight:800}.ptp-pdf-canvas{display:block;max-width:100%;height:auto}
+.ptp-pdf-watermark{position:absolute;right:12px;bottom:9px;z-index:3;padding:4px 7px;border-radius:6px;background:rgba(255,255,255,.72);color:rgba(20,55,45,.72);font-size:11px;font-weight:800;letter-spacing:.04em;pointer-events:none}
+.ptp-unit-guide-footer{display:flex;justify-content:space-between;gap:1rem;padding:8px 18px;font-size:.75rem;background:#0d342b;opacity:.9}
+.ptp-guide-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:.8rem 0}.ptp-guide-admin-grid label{display:grid;gap:.35rem}.ptp-guide-admin-grid .wide{grid-column:1/-1}
+.ptp-guide-admin-list{display:grid;gap:.5rem}.ptp-guide-admin-row{width:100%;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.75rem;text-align:left;color:inherit;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:10px;cursor:pointer}.ptp-guide-admin-row small{display:block;margin-top:.2rem;opacity:.75}
+@media(max-width:760px){.ptp-unit-guide-card{grid-template-columns:auto 1fr}.ptp-unit-guide-card .btn{grid-column:1/-1}.ptp-guide-admin-grid{grid-template-columns:1fr}.ptp-guide-admin-grid .wide{grid-column:auto}.ptp-unit-guide-overlay{padding:0}.ptp-unit-guide-shell{width:100vw;height:100vh;border-radius:0}.ptp-unit-guide-pages{padding:8px}}
+@media print{.ptp-unit-guide-overlay{display:none!important}}

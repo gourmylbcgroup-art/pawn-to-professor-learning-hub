@@ -1,39 +1,55 @@
-PAWN TO PROFESSOR v1.9.8y — HOBBY-SAFE
+PAWN TO PROFESSOR v1.9.8z — SECURE UNIT PDF GUIDES
 
-WHY THIS VERSION EXISTS
-Your last successful Vercel deployment already uses 12 Functions. The previous v1.9.8x patch added 3 new /api/admin endpoints, which would make 15. This Hobby-safe patch adds ZERO new Vercel Functions.
+WHAT THIS PATCH DOES
+- Adds one private PDF Activity Guide slot to every Unit.
+- PDFs stay in the SEPARATE Supabase Documents project.
+- Main Supabase still controls login and Unit access.
+- Vercel only authenticates and creates a short 5-minute signed URL.
+- PDF bytes go directly from the Documents Supabase Storage project to the browser.
+- This avoids using Vercel to serve the PDF file itself.
 
-HOW IT WORKS
-The three features now travel through the existing /api/security.js Vercel Function:
-- /api/security?action=curriculum-reminders
-- /api/security?action=unit-release-announcement
-- /api/security?action=mass-message
+MEMBER VIEWER
+- no normal Download button
+- no normal Print button
+- no permanent PDF URL shown
+- right-click disabled in the viewer
+- common Save/Print/Copy keyboard shortcuts blocked while open
+- small pawntoprofessor.com watermark at bottom-right of each page
+- pages render lazily as the teacher scrolls
 
-Their implementation files live under /api/_lib/. Helper modules under _lib are bundled into security.js and are not separate Vercel Functions.
+IMPORTANT LIMITATION
+A visible browser document can never be made impossible to copy. Screenshots, developer tools, and system-level capture remain possible. This patch is access control + ordinary-user deterrence, not DRM.
 
-IMPORTANT FILES TO REPLACE / ADD
-REPLACE:
-- /api/security.js
-- /api/_lib/mailbox-actions.js
-- /vercel.json
+REQUIRED VERCEL VARIABLES
+DOCS_SUPABASE_URL
+DOCS_SUPABASE_SERVICE_ROLE_KEY
 
-ADD:
-- /api/_lib/curriculum-reminders.js
-- /api/_lib/unit-release-announcement.js
-- /api/_lib/mass-message.js
-- /curriculum-communications-v1.9.8y.js
-- /curriculum-communications-v1.9.8y.css
-- /release-announcements-v1.9.8y.js
-- /release-announcements-v1.9.8y.css
+Your existing main variables are also used:
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
 
-DO NOT UPLOAD THESE AS /api/admin FUNCTIONS:
-- curriculum-reminders.js
-- unit-release-announcement.js
-- mass-message.js
+SEPARATE DOCS PROJECT
+Private Storage bucket name must be:
+unit-guides
 
-SQL
-If you already successfully ran the v1.9.8x SQL, DO NOT run SQL again. The database schema is the same.
-If you did not run it yet, run sql/CURRICULUM_COMMUNICATIONS_v1.9.8y.sql once.
+Example file path:
+grade6/unit4-activity-guide.pdf
 
-EXPECTED VERCEL RESULT
-The deployment should stay at the same Function count as the existing site (approximately 12), instead of increasing to 15.
+INSTALL
+1. MAIN Supabase → SQL Editor → run sql/UNIT_PDF_GUIDES_v1.9.8z.sql
+2. Upload unit-pdf-guides-v1.9.8z.js and unit-pdf-guides-v1.9.8z.css to website root.
+3. Upload api/unit-guide.js to /api/unit-guide.js
+4. Edit index.html using INDEX-CHANGES.txt
+5. Commit and wait for Vercel deployment to become Ready.
+6. Login Admin → Unit Guides.
+7. Choose a Unit and save only the private Storage path, for example grade6/unit4-activity-guide.pdf
+8. Preview as Admin.
+9. Test a normal member with Unit access.
+10. Test a normal member without Unit access; the server must deny the signed URL.
+
+100-USER / VERCEL DESIGN
+- Vercel sends small JSON only.
+- PDF itself is not proxied through Vercel.
+- Docs Supabase Storage serves the PDF.
+- Signed URL expires in 300 seconds.
+- PDF pages are rendered lazily.
