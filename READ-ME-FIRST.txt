@@ -1,55 +1,41 @@
-PAWN TO PROFESSOR v1.9.8z — SECURE UNIT PDF GUIDES
+IMPORTANT — THIS VERSION DOES NOT ADD A NEW VERCEL FUNCTION
 
-WHAT THIS PATCH DOES
-- Adds one private PDF Activity Guide slot to every Unit.
-- PDFs stay in the SEPARATE Supabase Documents project.
-- Main Supabase still controls login and Unit access.
-- Vercel only authenticates and creates a short 5-minute signed URL.
-- PDF bytes go directly from the Documents Supabase Storage project to the browser.
-- This avoids using Vercel to serve the PDF file itself.
+Do this exactly:
 
-MEMBER VIEWER
-- no normal Download button
-- no normal Print button
-- no permanent PDF URL shown
-- right-click disabled in the viewer
-- common Save/Print/Copy keyboard shortcuts blocked while open
-- small pawntoprofessor.com watermark at bottom-right of each page
-- pages render lazily as the teacher scrolls
+1. DELETE this file if it exists:
+   api/unit-guide.js
 
-IMPORTANT LIMITATION
-A visible browser document can never be made impossible to copy. Screenshots, developer tools, and system-level capture remain possible. This patch is access control + ordinary-user deterrence, not DRM.
+2. REPLACE your existing:
+   api/security.js
+   with the api/security.js included in this patch.
 
-REQUIRED VERCEL VARIABLES
-DOCS_SUPABASE_URL
-DOCS_SUPABASE_SERVICE_ROLE_KEY
+3. ADD this helper:
+   api/_lib/unit-guide.js
 
-Your existing main variables are also used:
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
+   This helper is imported by api/security.js and does not create a separate public API route.
 
-SEPARATE DOCS PROJECT
-Private Storage bucket name must be:
-unit-guides
+4. REPLACE:
+   unit-pdf-guides-v1.9.8z.js
+   with:
+   unit-pdf-guides-v1.9.8z2.js
 
-Example file path:
-grade6/unit4-activity-guide.pdf
+5. You can keep the CSS reference in index.html, but change the JS filename:
+   <script src="./unit-pdf-guides-v1.9.8z2.js" defer></script>
 
-INSTALL
-1. MAIN Supabase → SQL Editor → run sql/UNIT_PDF_GUIDES_v1.9.8z.sql
-2. Upload unit-pdf-guides-v1.9.8z.js and unit-pdf-guides-v1.9.8z.css to website root.
-3. Upload api/unit-guide.js to /api/unit-guide.js
-4. Edit index.html using INDEX-CHANGES.txt
-5. Commit and wait for Vercel deployment to become Ready.
-6. Login Admin → Unit Guides.
-7. Choose a Unit and save only the private Storage path, for example grade6/unit4-activity-guide.pdf
-8. Preview as Admin.
-9. Test a normal member with Unit access.
-10. Test a normal member without Unit access; the server must deny the signed URL.
+6. Upload:
+   unit-pdf-guides-v1.9.8z2.css
+   and change the CSS filename in index.html too if you use this file.
 
-100-USER / VERCEL DESIGN
-- Vercel sends small JSON only.
-- PDF itself is not proxied through Vercel.
-- Docs Supabase Storage serves the PDF.
-- Signed URL expires in 300 seconds.
-- PDF pages are rendered lazily.
+7. Your SQL is ALREADY DONE. Do not run SQL again.
+
+8. Vercel variables must remain:
+   DOCS_SUPABASE_URL
+   DOCS_SUPABASE_SERVICE_ROLE_KEY
+
+The PDF API is now:
+   /api/security?action=unit-guide
+
+instead of:
+   /api/unit-guide
+
+This means the PDF system reuses your existing security Vercel Function.

@@ -7,6 +7,7 @@ import { handleRecordAnnualPayment, handlePaymentAdjustment, handleRenewalRemind
 import handleCurriculumReminders from './_lib/curriculum-reminders.js';
 import handleUnitReleaseAnnouncement from './_lib/unit-release-announcement.js';
 import handleMassMessage from './_lib/mass-message.js';
+import handleUnitGuide from './_lib/unit-guide.js';
 import {
   json,
   getAuthenticatedProfile,
@@ -355,9 +356,7 @@ async function requestPasswordReset({ req, res, admin }) {
     await admin.from('password_reset_challenges')
       .delete()
       .lt('expires_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  } catch {
-    // Cleanup failure must not block a successful reset-email request.
-  }
+  } catch {}
 
   return json(res, 200, { ok: true, message: genericResetMessage });
 }
@@ -406,9 +405,7 @@ async function resetPassword({ req, res, admin }) {
       admin.from('device_verification_challenges').delete().eq('user_id', challenge.user_id),
       admin.from('password_reset_challenges').delete().eq('user_id', challenge.user_id).neq('id', challenge.id)
     ]);
-  } catch {
-    // Password reset already succeeded; cleanup can be retried later.
-  }
+  } catch {}
 
   try {
     await admin.from('audit_log').insert({
@@ -418,9 +415,7 @@ async function resetPassword({ req, res, admin }) {
       entity_id: challenge.user_id,
       details: { method: 'secure_email_link' }
     });
-  } catch {
-    // Audit logging failure must not invalidate a completed password reset.
-  }
+  } catch {}
 
   return json(res, 200, { ok: true });
 }
@@ -470,6 +465,8 @@ export default async function handler(req, res) {
       return handleUnitReleaseAnnouncement(req, res);
     case 'mass-message':
       return handleMassMessage(req, res);
+    case 'unit-guide':
+      return handleUnitGuide({ req, res, admin });
     default:
       return json(res, 404, { error: 'Unknown security action.' });
   }
