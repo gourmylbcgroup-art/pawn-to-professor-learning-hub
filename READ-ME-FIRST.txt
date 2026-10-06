@@ -17,13 +17,13 @@ Do this exactly:
 4. REPLACE:
    unit-pdf-guides-v1.9.8z.js
    with:
-   unit-pdf-guides-v1.9.8z2.js
+   unit-pdf-guides-v1.9.8z3.js
 
 5. You can keep the CSS reference in index.html, but change the JS filename:
-   <script src="./unit-pdf-guides-v1.9.8z2.js" defer></script>
+   <script src="./unit-pdf-guides-v1.9.8z3.js" defer></script>
 
 6. Upload:
-   unit-pdf-guides-v1.9.8z2.css
+   unit-pdf-guides-v1.9.8z3.css
    and change the CSS filename in index.html too if you use this file.
 
 7. Your SQL is ALREADY DONE. Do not run SQL again.
@@ -39,3 +39,9 @@ instead of:
    /api/unit-guide
 
 This means the PDF system reuses your existing security Vercel Function.
+
+
+v1.9.8z3 MENU VISIBILITY FIX
+- The Unit Guides button is now inserted directly after Admin → Resources.
+- This avoids the button being placed at the very bottom of a long Admin sidebar.
+- If Resources cannot be found, Unit Guides is placed at the top.
