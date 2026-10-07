@@ -1,29 +1,18 @@
-Pawn to Professor v1.9.8z8 — CLEAN MANUAL ANNOUNCEMENTS
+Pawn to Professor v1.9.8z9 — ANNOUNCEMENT EDIT FIX
 
-WHY YOU COULD NOT SEE THE NEW ANNOUNCEMENT MANAGER
-Your live index.html was still loading the OLD:
-  release-announcements-v1.9.8y.css
-  release-announcements-v1.9.8y.js
+Upload:
+- manual-announcements-v1.9.8z9.js
+- manual-announcements-v1.9.8z9.css
 
-and was NOT loading the manual announcement files.
+Then change index.html from z8 to z9.
 
-This z8 patch:
-- hides/removes the old ugly release box
-- adds Admin -> Announcements
-- shows ONE compact announcement strip
-- uses your own short text
-- keeps optional publish/expiry/email controls
+No SQL change.
+No backend change.
 
-UPLOAD TO WEBSITE ROOT:
-  manual-announcements-v1.9.8z8.js
-  manual-announcements-v1.9.8z8.css
-
-BACKEND:
-Keep the already uploaded:
-  api/_lib/unit-release-announcement.js
-
-SUPABASE:
-Keep the SQL you already ran.
-
-INDEX:
-Use the included corrected index.html.
+Edit now:
+- loads the selected announcement into the editor
+- scrolls to the editor
+- highlights the selected card
+- shows “Editing: …”
+- changes Save to “Update Announcement”
+- adds Cancel Edit
