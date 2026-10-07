@@ -1,54 +1,23 @@
-Pawn to Professor v1.9.8t — PUBLIC VISITOR TRACKING FIX
+v1.9.8z4 — ROBUST UNIT GUIDES MENU FIX
 
-WHAT IT FIXES
-The public visitor counter stayed at 0 because the old patch waited for:
-  globalThis.state?.client
+This version fixes the missing Admin menu without depending on renderAdmin wrapping.
 
-Your main app defines:
-  const state = { ... }
+1. Keep:
+   api/security.js
+   api/_lib/unit-guide.js
 
-That does not reliably expose state as globalThis.state.
+2. DELETE old frontend files if you want:
+   unit-pdf-guides-v1.9.8z2.js
+   unit-pdf-guides-v1.9.8z2.css
+   unit-pdf-guides-v1.9.8z3.js
+   unit-pdf-guides-v1.9.8z3.css
 
-This patch directly checks the existing state variable and falls back to globalThis.state only if available.
+3. Upload:
+   unit-pdf-guides-v1.9.8z4.js
+   unit-pdf-guides-v1.9.8z4.css
 
-INSTALLATION
-1. Upload:
-   public-visitor-fix-v1.9.8t.js
+4. index.html must load z4.
 
-2. In index.html, add this line AFTER:
-   <script src="./analytics-retention-v1.9.8s.js" defer></script>
+5. Vercel redeploy.
 
-   Add:
-   <script src="./public-visitor-fix-v1.9.8t.js" defer></script>
-
-3. Redeploy Vercel.
-
-4. Test in a PRIVATE / INCOGNITO browser window while NOT logged in.
-   Open the main login page and wait about 2 seconds.
-
-5. Log in as Admin and go to Usage Analytics → Homepage Activity → Refresh.
-   Public visits should increase.
-
-IMPORTANT
-- One page load = one anonymous visit.
-- A random browser ID is used for unique-browser estimates.
-- No IP address is stored by this patch.
-- Logged-in members are NOT counted as public visitors.
-- If Supabase RPC fails, the browser console now shows the real error instead of hiding it.
-
-MANUAL DIAGNOSTIC
-Open browser console on the login page and run:
-  PTP_PUBLIC_VISITOR_FIX.status()
-
-Expected:
-  clientReady: true
-  loginVisible: true
-  hasSession: false
-
-To retry manually:
-  PTP_PUBLIC_VISITOR_FIX.retry()
-
-If the console then says:
-  log_public_home_visit failed
-
-the problem is in the Supabase RPC/policy rather than the browser script.
+The Unit Guides button is injected by observing the actual Admin DOM and is placed directly after Resources.
