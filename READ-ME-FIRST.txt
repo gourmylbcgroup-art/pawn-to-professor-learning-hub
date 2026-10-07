@@ -1,23 +1,27 @@
-v1.9.8z4 — ROBUST UNIT GUIDES MENU FIX
+Pawn to Professor v1.9.8z5 — UNIT GUIDES CRASH FIX
 
-This version fixes the missing Admin menu without depending on renderAdmin wrapping.
+CAUSE
+v1.9.8z4 used a MutationObserver. When Unit Guides opened, rendering the panel
+changed the DOM, which triggered the observer again, which rendered the panel
+again, repeatedly. That could freeze/crash the website.
 
-1. Keep:
+FIX
+v1.9.8z5 marks a Unit Guides panel as rendered BEFORE changing its contents.
+The observer therefore does not continuously re-render it.
+
+INSTALL
+1. Upload:
+   unit-pdf-guides-v1.9.8z5.js
+   unit-pdf-guides-v1.9.8z5.css
+
+2. Change index.html from z4 to z5:
+   <link rel="stylesheet" href="./unit-pdf-guides-v1.9.8z5.css" />
+   <script src="./unit-pdf-guides-v1.9.8z5.js" defer></script>
+
+3. You do NOT need to change:
    api/security.js
    api/_lib/unit-guide.js
+   Supabase SQL
+   Vercel DOCS_ variables
 
-2. DELETE old frontend files if you want:
-   unit-pdf-guides-v1.9.8z2.js
-   unit-pdf-guides-v1.9.8z2.css
-   unit-pdf-guides-v1.9.8z3.js
-   unit-pdf-guides-v1.9.8z3.css
-
-3. Upload:
-   unit-pdf-guides-v1.9.8z4.js
-   unit-pdf-guides-v1.9.8z4.css
-
-4. index.html must load z4.
-
-5. Vercel redeploy.
-
-The Unit Guides button is injected by observing the actual Admin DOM and is placed directly after Resources.
+4. Redeploy and hard refresh.
