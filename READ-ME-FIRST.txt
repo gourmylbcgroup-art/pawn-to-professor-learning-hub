@@ -1,58 +1,29 @@
-PAWN TO PROFESSOR v1.9.8z7 — MANUAL ANNOUNCEMENT MANAGER
+Pawn to Professor v1.9.8z8 — CLEAN MANUAL ANNOUNCEMENTS
 
-WHAT CHANGES
-- Stops the automatic long Unit-release message on the homepage.
-- Adds Admin -> Announcements.
-- You write the announcement yourself.
-- Homepage shows ONE announcement only.
-- Announcement is full-width, so text is not squashed into the top-left.
-- Default recommended text:
-    Title: New release
-    Message: New Unit content is now available.
-- You can set:
-    publish date/time
-    expiry date/time
-    show/hide
-    optional email to all active members
-- Existing old long announcements remain in the database until you hide/delete them.
+WHY YOU COULD NOT SEE THE NEW ANNOUNCEMENT MANAGER
+Your live index.html was still loading the OLD:
+  release-announcements-v1.9.8y.css
+  release-announcements-v1.9.8y.js
 
-INSTALL
-1. MAIN SUPABASE:
-   Run:
-     sql/MANUAL_ANNOUNCEMENTS_v1.9.8z7.sql
+and was NOT loading the manual announcement files.
 
-2. WEBSITE ROOT:
-   Upload:
-     manual-announcements-v1.9.8z7.js
-     manual-announcements-v1.9.8z7.css
+This z8 patch:
+- hides/removes the old ugly release box
+- adds Admin -> Announcements
+- shows ONE compact announcement strip
+- uses your own short text
+- keeps optional publish/expiry/email controls
 
-3. BACKEND:
-   Replace:
-     api/_lib/unit-release-announcement.js
-   with the file in this patch.
+UPLOAD TO WEBSITE ROOT:
+  manual-announcements-v1.9.8z8.js
+  manual-announcements-v1.9.8z8.css
 
-   No new Vercel Function is added. It reuses:
-     /api/security?action=unit-release-announcement
+BACKEND:
+Keep the already uploaded:
+  api/_lib/unit-release-announcement.js
 
-4. INDEX.HTML:
-   REMOVE the old:
-     release-announcements-v1.9.8y.css
-     release-announcements-v1.9.8y.js
+SUPABASE:
+Keep the SQL you already ran.
 
-   ADD:
-     <link rel="stylesheet" href="./manual-announcements-v1.9.8z7.css" />
-     <script src="./manual-announcements-v1.9.8z7.js" defer></script>
-
-5. Redeploy Vercel and hard refresh.
-
-USE
-Admin -> Announcements
-
-Recommended:
-Title: New release
-Message: New Unit content is now available.
-Expiry: 7 to 14 days
-Show on homepage: checked
-
-If you want members emailed too, use:
-Save + Email Members
+INDEX:
+Use the included corrected index.html.

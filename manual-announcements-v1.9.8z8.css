@@ -1,0 +1,75 @@
+/* Pawn to Professor v1.9.8z8 — compact clean announcement */
+.ptp-announcement-strip{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:.8rem;
+  width:100%;
+  margin:0 0 .75rem;
+  padding:.65rem .85rem;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.08);
+  box-shadow:none;
+}
+
+.ptp-announcement-icon{
+  font-size:1.15rem;
+  line-height:1;
+}
+
+.ptp-announcement-copy{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:.55rem;
+  flex-wrap:wrap;
+}
+
+.ptp-announcement-copy strong{
+  font-size:.98rem;
+  white-space:nowrap;
+}
+
+.ptp-announcement-copy span{
+  font-size:.82rem;
+  color:var(--chalk-soft);
+  line-height:1.3;
+}
+
+.ptp-announcement-strip small{
+  font-size:.72rem;
+  opacity:.68;
+  white-space:nowrap;
+}
+
+/* Old release UI is intentionally hidden if any old stylesheet/script is still cached. */
+.release-news-panel{
+  display:none!important;
+}
+
+.announcement-admin-card{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:.8rem;
+  padding:.7rem;
+  margin:.45rem 0;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);
+}
+.announcement-admin-card p{margin:.2rem 0}
+.announcement-admin-card small{opacity:.75}
+.announcement-admin-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.admin-tabs>[data-announcements-native="true"]{
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+
+@media(max-width:760px){
+  .ptp-announcement-strip{grid-template-columns:auto 1fr}
+  .ptp-announcement-strip small{grid-column:2}
+  .announcement-admin-card{flex-direction:column}
+}
