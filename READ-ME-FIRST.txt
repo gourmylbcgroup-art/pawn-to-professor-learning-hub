@@ -1,27 +1,12 @@
-Pawn to Professor v1.9.8z5 — UNIT GUIDES CRASH FIX
+Pawn to Professor v1.9.8y2 — Release Announcement Layout Fix
 
-CAUSE
-v1.9.8z4 used a MutationObserver. When Unit Guides opened, rendering the panel
-changed the DOM, which triggered the observer again, which rendered the panel
-again, repeatedly. That could freeze/crash the website.
+Upload this file to your website root:
+  release-announcements-v1.9.8y2.css
 
-FIX
-v1.9.8z5 marks a Unit Guides panel as rendered BEFORE changing its contents.
-The observer therefore does not continuously re-render it.
+Then in index.html replace:
+  release-announcements-v1.9.8y.css
 
-INSTALL
-1. Upload:
-   unit-pdf-guides-v1.9.8z5.js
-   unit-pdf-guides-v1.9.8z5.css
+with:
+  release-announcements-v1.9.8y2.css
 
-2. Change index.html from z4 to z5:
-   <link rel="stylesheet" href="./unit-pdf-guides-v1.9.8z5.css" />
-   <script src="./unit-pdf-guides-v1.9.8z5.js" defer></script>
-
-3. You do NOT need to change:
-   api/security.js
-   api/_lib/unit-guide.js
-   Supabase SQL
-   Vercel DOCS_ variables
-
-4. Redeploy and hard refresh.
+This fixes the squashed top-left announcement card.
