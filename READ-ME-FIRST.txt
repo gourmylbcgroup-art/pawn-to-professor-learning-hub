@@ -1,12 +1,58 @@
-Pawn to Professor v1.9.8y2 — Release Announcement Layout Fix
+PAWN TO PROFESSOR v1.9.8z7 — MANUAL ANNOUNCEMENT MANAGER
 
-Upload this file to your website root:
-  release-announcements-v1.9.8y2.css
+WHAT CHANGES
+- Stops the automatic long Unit-release message on the homepage.
+- Adds Admin -> Announcements.
+- You write the announcement yourself.
+- Homepage shows ONE announcement only.
+- Announcement is full-width, so text is not squashed into the top-left.
+- Default recommended text:
+    Title: New release
+    Message: New Unit content is now available.
+- You can set:
+    publish date/time
+    expiry date/time
+    show/hide
+    optional email to all active members
+- Existing old long announcements remain in the database until you hide/delete them.
 
-Then in index.html replace:
-  release-announcements-v1.9.8y.css
+INSTALL
+1. MAIN SUPABASE:
+   Run:
+     sql/MANUAL_ANNOUNCEMENTS_v1.9.8z7.sql
 
-with:
-  release-announcements-v1.9.8y2.css
+2. WEBSITE ROOT:
+   Upload:
+     manual-announcements-v1.9.8z7.js
+     manual-announcements-v1.9.8z7.css
 
-This fixes the squashed top-left announcement card.
+3. BACKEND:
+   Replace:
+     api/_lib/unit-release-announcement.js
+   with the file in this patch.
+
+   No new Vercel Function is added. It reuses:
+     /api/security?action=unit-release-announcement
+
+4. INDEX.HTML:
+   REMOVE the old:
+     release-announcements-v1.9.8y.css
+     release-announcements-v1.9.8y.js
+
+   ADD:
+     <link rel="stylesheet" href="./manual-announcements-v1.9.8z7.css" />
+     <script src="./manual-announcements-v1.9.8z7.js" defer></script>
+
+5. Redeploy Vercel and hard refresh.
+
+USE
+Admin -> Announcements
+
+Recommended:
+Title: New release
+Message: New Unit content is now available.
+Expiry: 7 to 14 days
+Show on homepage: checked
+
+If you want members emailed too, use:
+Save + Email Members
