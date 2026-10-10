@@ -1,18 +1,52 @@
-Pawn to Professor v1.9.8z9 — ANNOUNCEMENT EDIT FIX
+PAWN TO PROFESSOR v1.9.8w — LEARNING HUB RIGHT-CLICK / SAVE-AS BLOCKER
 
-Upload:
-- manual-announcements-v1.9.8z9.js
-- manual-announcements-v1.9.8z9.css
+PURPOSE
+This patch blocks the NORMAL browser actions that let users quickly save images/files
+from the Learning Hub interface, including:
+- right-click context menu on protected content
+- drag-to-desktop
+- Ctrl+S / Cmd+S
+- Ctrl+P / Cmd+P
+- Ctrl+U / Cmd+U
+- direct clicks on download links to image/PDF/media files
+- middle-click open-in-new-tab on direct media links
 
-Then change index.html from z8 to z9.
+WHAT IT COVERS
+- images shown on the Learning Hub
+- flashcards/slides/images displayed by the Learning Hub interface
+- resource cards and package cards
+- secure-player shell areas
 
-No SQL change.
-No backend change.
+IMPORTANT LIMITATION
+No browser patch can make content impossible to extract.
+A determined user can still use:
+- screenshots
+- browser developer tools
+- network inspection
+- browser cache
 
-Edit now:
-- loads the selected announcement into the editor
-- scrolls to the editor
-- highlights the selected card
-- shows “Editing: …”
-- changes Save to “Update Announcement”
-- adds Cancel Edit
+For cross-origin activities embedded inside an iframe:
+- this patch protects the Learning Hub shell and UI actions
+- it cannot control the inside of a third-party iframe unless that activity itself is patched too
+
+INSTALL
+1. Upload these files to the website root:
+   hub-protection-v1.9.8w.js
+   hub-protection-v1.9.8w.css
+
+2. In index.html, add inside <head>:
+   <link rel="stylesheet" href="./hub-protection-v1.9.8w.css" />
+
+3. In index.html, add near the bottom with the other scripts:
+   <script src="./hub-protection-v1.9.8w.js" defer></script>
+
+4. In play.html, add inside <head>:
+   <link rel="stylesheet" href="./hub-protection-v1.9.8w.css" />
+
+5. In play.html, add near the bottom with the other scripts:
+   <script src="./hub-protection-v1.9.8w.js" defer></script>
+
+6. Redeploy Vercel and hard refresh.
+
+NO NEW VERCEL FUNCTIONS
+This is frontend only. It adds ZERO new Vercel Functions.

@@ -1,0 +1,29 @@
+/* Pawn to Professor v1.9.8w — Learning Hub right-click / save-as blocker */
+img,
+picture,
+canvas,
+svg,
+video,
+.resource-thumb,
+.flashcard,
+.slide-image,
+.presentation-slide,
+[data-protect-media] {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+a[download]:not([data-ptp-allow-direct-download]) {
+  cursor: not-allowed !important;
+}
+
+#gameStage,
+.resource-card,
+.package-card,
+.viewer-modal,
+.modal,
+.slides-grid {
+  -webkit-touch-callout: none;
+}
