@@ -1,4 +1,4 @@
-/* Pawn to Professor — Flashcard Storage Bridge v1 */
+/* Pawn to Professor — Flashcard Storage Bridge v1.1 (3 sets / 40 cards) */
 (() => {
   'use strict';
   const CHANNEL = 'ptp-flashcard-storage-v1';
@@ -8,7 +8,6 @@
   function reply(target, origin, requestId, ok, payload = {}) {
     try { target.postMessage({channel:CHANNEL,type:'response',requestId,ok,...payload}, origin); } catch {}
   }
-
   function clean(v='', max=120){ return String(v ?? '').trim().slice(0,max); }
 
   async function getClient() {
@@ -51,12 +50,17 @@
       }
 
       if (msg.action === 'save') {
+        const cardIds = Array.isArray(msg.cardIds) ? msg.cardIds : [];
+        const hiddenCardIds = Array.isArray(msg.hiddenCardIds) ? msg.hiddenCardIds : [];
+        if (cardIds.length > 40) throw new Error('A saved set can contain a maximum of 40 flashcards.');
+        if (hiddenCardIds.length > 40) throw new Error('A saved set can contain a maximum of 40 flashcards.');
+
         const row = {
           set_name: clean(msg.setName,100),
           unit_key: unitKey,
           lesson_key: lessonKey,
-          card_ids: Array.isArray(msg.cardIds) ? msg.cardIds : [],
-          hidden_card_ids: Array.isArray(msg.hiddenCardIds) ? msg.hiddenCardIds : [],
+          card_ids: cardIds,
+          hidden_card_ids: hiddenCardIds,
           metadata: msg.metadata && typeof msg.metadata === 'object' && !Array.isArray(msg.metadata) ? msg.metadata : {}
         };
         if (!row.set_name) throw new Error('Enter a set name.');
@@ -68,7 +72,7 @@
         const {data,error} = await query;
         if (error) {
           if (String(error.message || '').includes('FLASHCARD_SET_LIMIT_REACHED')) {
-            throw new Error('You already have 20 saved sets for this lesson. Delete one first.');
+            throw new Error('You already have 3 saved sets for this lesson. Delete one before saving another.');
           }
           throw error;
         }
@@ -89,5 +93,5 @@
     }
   });
 
-  globalThis.PTP_FLASHCARD_BRIDGE = {version:'1'};
+  globalThis.PTP_FLASHCARD_BRIDGE = {version:'1.1'};
 })();
