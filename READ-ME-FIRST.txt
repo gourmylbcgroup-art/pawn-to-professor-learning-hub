@@ -1,52 +1,84 @@
-PAWN TO PROFESSOR v1.9.8w — LEARNING HUB RIGHT-CLICK / SAVE-AS BLOCKER
+PAWN TO PROFESSOR — GENERIC FLASHCARD STORAGE v1
 
-PURPOSE
-This patch blocks the NORMAL browser actions that let users quickly save images/files
-from the Learning Hub interface, including:
-- right-click context menu on protected content
-- drag-to-desktop
-- Ctrl+S / Cmd+S
-- Ctrl+P / Cmd+P
-- Ctrl+U / Cmd+U
-- direct clicks on download links to image/PDF/media files
-- middle-click open-in-new-tab on direct media links
+WHAT THIS BUILDS
+One generic saved-flashcard system for all grades, Units, lessons, teachers and learners.
 
-WHAT IT COVERS
-- images shown on the Learning Hub
-- flashcards/slides/images displayed by the Learning Hub interface
-- resource cards and package cards
-- secure-player shell areas
+LIMIT
+20 saved sets per USER per LESSON.
 
-IMPORTANT LIMITATION
-No browser patch can make content impossible to extract.
-A determined user can still use:
-- screenshots
-- browser developer tools
-- network inspection
-- browser cache
+WHY THIS ARCHITECTURE
+Your interactive lessons may be hosted on another domain. Supabase login sessions do not automatically transfer between domains.
 
-For cross-origin activities embedded inside an iframe:
-- this patch protects the Learning Hub shell and UI actions
-- it cannot control the inside of a third-party iframe unless that activity itself is patched too
+So we use:
 
-INSTALL
-1. Upload these files to the website root:
-   hub-protection-v1.9.8w.js
-   hub-protection-v1.9.8w.css
+Interactive lesson
+  ptp-flashcard-storage.js
+        ↓ postMessage
+Learning Hub play.html
+  ptp-flashcard-bridge.js
+        ↓ authenticated Supabase session
+MAIN Supabase
+  user_flashcard_sets
 
-2. In index.html, add inside <head>:
-   <link rel="stylesheet" href="./hub-protection-v1.9.8w.css" />
+ZERO new Vercel Functions.
 
-3. In index.html, add near the bottom with the other scripts:
-   <script src="./hub-protection-v1.9.8w.js" defer></script>
+SETUP
 
-4. In play.html, add inside <head>:
-   <link rel="stylesheet" href="./hub-protection-v1.9.8w.css" />
+STEP 1 — SUPABASE
+Run:
+  01-GENERIC-FLASHCARD-STORAGE.sql
 
-5. In play.html, add near the bottom with the other scripts:
-   <script src="./hub-protection-v1.9.8w.js" defer></script>
+in:
+  MAIN Supabase → SQL Editor → New Query → Run
 
-6. Redeploy Vercel and hard refresh.
+Expected:
+  Success. No rows returned.
 
-NO NEW VERCEL FUNCTIONS
-This is frontend only. It adds ZERO new Vercel Functions.
+STEP 2 — LEARNING HUB
+Upload to the Learning Hub website root:
+  ptp-flashcard-bridge.js
+
+In play.html, AFTER play.js, add:
+  <script src="./ptp-flashcard-bridge.js" defer></script>
+
+STEP 3 — EACH INTERACTIVE LESSON
+Put inside that lesson folder:
+  ptp-flashcard-storage.js
+
+Then add to that lesson index.html:
+
+  <script>
+  window.PTP_FLASHCARD_CONFIG = {
+    unitKey: 'grade3_unit3_family_pets',
+    lessonKey: 'week6_family_pets'
+  };
+  </script>
+
+  <script src="./ptp-flashcard-storage.js" defer></script>
+
+Every lesson must have its own stable unitKey + lessonKey.
+
+STEP 4 — CONNECT THE LESSON BUTTONS
+Use:
+  PTPFlashcardStorage.listSets()
+  PTPFlashcardStorage.saveSet(...)
+  PTPFlashcardStorage.deleteSet(id)
+
+See:
+  EXAMPLE-LESSON-INTEGRATION.html
+
+STEP 5 — TEST
+1. Login as normal teacher or learner.
+2. Open the lesson THROUGH the Learning Hub.
+3. Save a set.
+4. Refresh.
+5. Load the saved sets.
+6. Login as another user and confirm they cannot see the first user's sets.
+7. Create 20 sets in one lesson; the 21st must be refused.
+
+NOTES
+- Teachers and learners see only their own sets.
+- Admin/Owner can access all sets.
+- The 20-set limit is enforced in Supabase.
+- No API route is added.
+- No new Vercel Function is added.

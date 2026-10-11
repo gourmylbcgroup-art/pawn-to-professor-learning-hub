@@ -1,0 +1,31 @@
+<!-- Add to each interactive lesson index.html -->
+
+<script>
+window.PTP_FLASHCARD_CONFIG = {
+  unitKey: 'grade3_unit3_family_pets',
+  lessonKey: 'week6_family_pets'
+};
+</script>
+
+<script src="./ptp-flashcard-storage.js" defer></script>
+
+<script>
+// Example usage:
+async function saveExample(){
+  await PTPFlashcardStorage.saveSet({
+    setName:'My Set 1',
+    cardIds:['mother','father','brother'],
+    hiddenCardIds:['uncle'],
+    metadata:{source:'family-pets'}
+  });
+}
+
+async function loadExample(){
+  const sets=await PTPFlashcardStorage.listSets();
+  console.log(sets);
+}
+
+async function deleteExample(id){
+  await PTPFlashcardStorage.deleteSet(id);
+}
+</script>
