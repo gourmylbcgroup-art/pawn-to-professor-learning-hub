@@ -1012,6 +1012,12 @@ async function saveUserAndPermissions(container,user) {
     admin_notes:container.querySelector('#userNotes').value.trim() || null
   };
   if (isOwner()) profilePatch.role = role;
+  // Public-registration trials use the same end date as the account expiry.
+  // Do not change trials for staff or accounts without an existing trial.
+  // An empty expiry date leaves existing trial dates unchanged.
+  if (user.registration_source === 'public' && user.trial_started_at && expiresAt && !['admin','owner'].includes(role)) {
+    profilePatch.trial_ends_at = expiresAt;
+  }
   const {error:profileError}=await state.client.from('profiles').update(profilePatch).eq('id',user.id);
   if(profileError) return toast(profileError.message);
 
